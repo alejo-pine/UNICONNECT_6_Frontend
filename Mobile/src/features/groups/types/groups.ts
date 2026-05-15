@@ -7,6 +7,13 @@ export interface StudyGroupSubject {
   name: string;
 }
 
+export interface GroupUser {
+  id: string;
+  name?: string;
+  email?: string;
+  avatarUrl?: string;
+}
+
 /**
  * Respuesta genérica de la API
  */
@@ -41,11 +48,14 @@ export interface StudyGroup {
   subject?: StudyGroupSubject;
   category?: StudyGroupCategory;
   creator_id: string;
+  createdBy?: string;
   created_at: string;
   updated_at?: string;
   member_count?: number;
   is_member?: boolean;
   is_admin: boolean;
+  members?: GroupUser[];
+  pendingRequests?: GroupUser[];
 }
 
 /**

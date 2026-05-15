@@ -8,6 +8,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { groupsHttpService } from '../services/groupsHttpService';
 import { subjectsHttpService } from '../services/subjectsHttpService';
 import type { StudyGroup } from '../types/groups';
+import { io } from 'socket.io-client';
+
+const realtimeSocketUrl = process.env.BACKEND_PUBLIC_URL || 'http://10.0.2.2:3000';
+
+const toUserIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (typeof item === 'number') return String(item);
+      if (item && typeof item === 'object') {
+        const maybeUser = item as Record<string, unknown>;
+        if (typeof maybeUser.id === 'string') return maybeUser.id;
+        if (typeof maybeUser.userId === 'string') return maybeUser.userId;
+        if (typeof maybeUser.user_id === 'string') return maybeUser.user_id;
+        if (typeof maybeUser.profile_id === 'string') return maybeUser.profile_id;
+      }
+      return '';
+    })
+    .filter((id) => id.length > 0);
+};
 
 const SUBJECT_NAME_CACHE_KEY = 'subject_name_cache';
 
@@ -18,6 +39,7 @@ interface UseGroupDetailReturn {
   reload: () => Promise<void>;
   joinGroup: () => Promise<{ success: boolean; error?: string }>;
   leaveGroup: () => Promise<{ success: boolean; error?: string }>;
+  transferAdmin: (toUserId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
@@ -26,6 +48,7 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
@@ -181,6 +204,53 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (!token || !groupId) return;
+
+    const socket = io(realtimeSocketUrl, {
+      auth: { Authorization: `Bearer ${token}` },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('study-group:join', { groupId });
+    });
+
+    socket.on('study-group:updated', (payload) => {
+      if (payload.groupId === groupId) {
+        const hasMembers = Array.isArray(payload.members);
+        const nextMembers = hasMembers ? toUserIds(payload.members) : [];
+
+        setGroup((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            members: hasMembers ? nextMembers : prev.members,
+            member_count: hasMembers ? nextMembers.length : prev.member_count,
+          };
+        });
+
+        // Re-sync with backend to get any other new metadata
+        void reload();
+      }
+    });
+
+    if (socket.connected) {
+      socket.emit('study-group:join', { groupId });
+    }
+
+    return () => {
+      socket.emit('study-group:leave', { groupId });
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [groupId, token, reload]);
+
   const joinGroup = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!token || !groupId) {
       return { success: false, error: 'Se requieren credenciales válidas' };
@@ -253,5 +323,38 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     }
   }, [groupId, reload, token]);
 
-  return { group, loading, error, reload, joinGroup, leaveGroup };
+  const transferAdmin = useCallback(async (toUserId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !groupId) {
+      return { success: false, error: 'Se requieren credenciales válidas' };
+    }
+
+    try {
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
+
+      const response = await groupsHttpService.transferAdmin(groupId, toUserId, token);
+      if (!response.success) {
+        if (isMountedRef.current) {
+          setError(response.error || 'No se pudo transferir la administración');
+        }
+        return { success: false, error: response.error };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('[useGroupDetail] Error transferring admin:', err);
+      if (isMountedRef.current) {
+        setError('No se pudo transferir la administración');
+      }
+      return { success: false, error: 'No se pudo transferir la administración' };
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [groupId, token]);
+
+  return { group, loading, error, reload, joinGroup, leaveGroup, transferAdmin };
 };

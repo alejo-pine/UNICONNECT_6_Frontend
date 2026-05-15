@@ -34,7 +34,7 @@ export default function StudyGroupsLayout() {
       />
       <Stack.Screen name="create" options={{ title: 'Nuevo Grupo de Estudio' }} />
       <Stack.Screen name="[id]" options={{ title: 'Detalles del Grupo' }} />
-      <Stack.Screen name="wall" options={{ title: 'Muro del Grupo' }} />
+      <Stack.Screen name="transfer-admin" options={{ title: 'Transferir Administración' }} />
     </Stack>
   );
 }
