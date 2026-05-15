@@ -21,6 +21,8 @@ import {
   DrawerContentScrollView,
   DrawerItem,
 } from "@react-navigation/drawer";
+import { GlobalSocketNotifications } from "@/src/components/GlobalSocketNotifications";
+import { NotificationBell } from "@/src/components/NotificationBell";
 
 const PLATFORM_PRIMARY_BLUE = "#00284D";
 
@@ -303,7 +305,9 @@ export default function TabLayout() {
   );
 
   return (
-    <Drawer
+    <>
+      <GlobalSocketNotifications />
+      <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: true,
@@ -315,6 +319,7 @@ export default function TabLayout() {
           fontWeight: "600",
           fontSize: 17,
         },
+        headerRight: () => <NotificationBell />,
         overlayColor: "rgba(0,0,0,0.6)",
         drawerStyle: styles.drawerStyle,
         drawerType: "front",
@@ -349,6 +354,7 @@ export default function TabLayout() {
         }}
       />
     </Drawer>
+    </>
   );
 }
 

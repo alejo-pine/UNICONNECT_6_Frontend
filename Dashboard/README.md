@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# UniConnect — Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Panel de administración y visualización web para la plataforma UniConnect, construido con **React**, **TypeScript** y **Vite**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Pipeline CI/CD
 
-## React Compiler
+El proyecto implementa un flujo de integración y despliegue continuo automatizado mediante **GitHub Actions** y **Fly.io**, diseñado para garantizar la estabilidad y seguridad del código en producción.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Flujo de Trabajo (Main Branch)
 
-## Expanding the ESLint configuration
+Cada `push` a la rama `main` dispara automáticamente el pipeline en el siguiente orden:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1.  **Tests Unitarios**: Ejecución de la suite de pruebas con Vitest. Si alguna prueba falla, el flujo se detiene inmediatamente.
+2.  **Build Docker**: Creación de la imagen de contenedor utilizando los `build-args` configurados para inyectar variables de entorno de Vite.
+3.  **Deploy**: Despliegue de la nueva imagen en la infraestructura de Fly.io.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+> [!IMPORTANT]
+> Los Pull Requests a `main` también activan la ejecución de tests para validar cambios antes del merge, pero **no** disparan el despliegue automático.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🔐 Seguridad y Configuración
+
+### GitHub Secrets
+
+Para proteger la infraestructura y las credenciales, utilizamos **GitHub Secrets**. Nunca se deben subir archivos `.env` al repositorio (verificados en `.gitignore`).
+
+**Secrets requeridos:**
+*   `FLY_API_TOKEN`: Token de autenticación de Fly.io para autorizar el despliegue.
+*   `VITE_*`: Variables de entorno para el build de frontend (API URLs, Auth0 Config, Supabase keys, etc.).
+
+**Cómo configurar un nuevo Secret:**
+1.  Navega a la pestaña **Settings** de tu repositorio en GitHub.
+2.  En el menú lateral, selecciona **Secrets and variables** > **Actions**.
+3.  Haz clic en **New repository secret**.
+4.  Ingresa el nombre (ej. `FLY_API_TOKEN`) y su valor correspondiente.
+
+---
+
+## 🛠️ Comandos de Operación (Fly.io)
+
+### Autenticación Local
+Si necesitas operar el servicio desde tu terminal local:
+```bash
+fly auth login
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Despliegue Manual (Emergencia/Pruebas)
+Aunque el pipeline automatiza esto, puedes forzar un despliegue manual si tienes los permisos adecuados:
+```bash
+fly deploy --remote-only
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 📋 Requisitos de Desarrollo
+
+*   **Node.js**: v20 o superior.
+*   **Variables de Entorno**: Copiar `.env.example` a `.env` y configurar los valores locales.
+
+```bash
+cp .env.example .env
+npm install
+npm run dev
 ```

@@ -7,6 +7,7 @@ import { API_BASE_URL } from '@/src/config/api';
 import type {
     ApiResponse,
     CreateGroupResponse,
+  GroupUser,
     StudyGroup,
     StudyGroupCreatePayload,
 } from '../types/groups';
@@ -122,8 +123,84 @@ const resolveSubject = (rawGroup: Record<string, unknown>) => {
   return undefined;
 };
 
+const normalizeGroupUser = (raw: unknown): GroupUser | null => {
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const id = toStringSafe(raw);
+    return id ? { id } : null;
+  }
+
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const user = raw as Record<string, unknown>;
+  const id =
+    toStringSafe(user.id) ||
+    toStringSafe(user.user_id) ||
+    toStringSafe(user.userId) ||
+    toStringSafe(user.member_id) ||
+    toStringSafe(user.memberId);
+
+  if (!id) {
+    return null;
+  }
+
+  const name =
+    toStringSafe(user.name) ||
+    toStringSafe(user.full_name) ||
+    toStringSafe(user.fullName) ||
+    toStringSafe(user.displayName);
+
+  const email = toStringSafe(user.email);
+  const avatarUrl =
+    toStringSafe(user.avatar_url) || toStringSafe(user.avatarUrl) || toStringSafe(user.photoUrl);
+
+  return {
+    id,
+    name: name || undefined,
+    email: email || undefined,
+    avatarUrl: avatarUrl || undefined,
+  };
+};
+
+const normalizeGroupUsers = (rawUsers: unknown): GroupUser[] => {
+  if (!Array.isArray(rawUsers)) {
+    return [];
+  }
+
+  return rawUsers
+    .map(normalizeGroupUser)
+    .filter((user): user is GroupUser => Boolean(user));
+};
+
+const pickFirstUserList = (rawGroup: Record<string, unknown>, keys: string[]): GroupUser[] => {
+  for (const key of keys) {
+    const users = normalizeGroupUsers(rawGroup[key]);
+    if (users.length > 0) {
+      return users;
+    }
+  }
+
+  return [];
+};
+
 const normalizeGroup = (raw: unknown): StudyGroup => {
   const rawGroup = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  const creatorId =
+    toStringSafe(rawGroup.creator_id) ||
+    toStringSafe(rawGroup.creatorId) ||
+    toStringSafe(rawGroup.created_by) ||
+    toStringSafe(rawGroup.createdBy);
+
+  const members = pickFirstUserList(rawGroup, ['members', 'members_list', 'membersList']);
+
+  const pendingRequests = pickFirstUserList(rawGroup, [
+    'pendingRequests',
+    'pending_requests',
+    'join_requests',
+    'joinRequests',
+  ]);
 
   return {
     id: toStringSafe(rawGroup.id),
@@ -132,11 +209,8 @@ const normalizeGroup = (raw: unknown): StudyGroup => {
     subject_id: toStringSafe(rawGroup.subject_id) || toStringSafe(rawGroup.subjectId),
     subject: resolveSubject(rawGroup),
     category: rawGroup.category as StudyGroup['category'],
-    creator_id:
-      toStringSafe(rawGroup.creator_id) ||
-      toStringSafe(rawGroup.creatorId) ||
-      toStringSafe(rawGroup.created_by) ||
-      toStringSafe(rawGroup.createdBy),
+    creator_id: creatorId,
+    createdBy: creatorId,
     created_at: toStringSafe(rawGroup.created_at) || toStringSafe(rawGroup.createdAt),
     updated_at: toStringSafe(rawGroup.updated_at) || toStringSafe(rawGroup.updatedAt) || undefined,
     member_count:
@@ -145,6 +219,8 @@ const normalizeGroup = (raw: unknown): StudyGroup => {
       toNumberSafe(rawGroup.members_count),
     is_member: toBooleanSafe(rawGroup.is_member ?? rawGroup.isMember),
     is_admin: toBooleanSafe(rawGroup.is_admin ?? rawGroup.isAdmin),
+    members,
+    pendingRequests,
   };
 };
 
