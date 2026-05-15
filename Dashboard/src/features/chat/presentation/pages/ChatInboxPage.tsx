@@ -71,7 +71,11 @@ export function ChatInboxPage() {
                 <WallInboxItemRow
                   key={item.groupId}
                   item={item}
-                  onClick={() => navigate(`/chat/groups/${item.groupId}/wall`)}
+                  onClick={() =>
+                    navigate(`/chat/groups/${item.groupId}/wall`, {
+                      state: { groupName: item.groupName },
+                    })
+                  }
                 />
               ))}
             </div>
