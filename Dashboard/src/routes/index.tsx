@@ -9,6 +9,7 @@ import { GroupsListPage } from '@features/groups/presentation/pages/GroupsListPa
 import { GroupDetailPage } from '@features/groups/presentation/pages/GroupDetailPage';
 import { CreateGroupPage } from '@features/groups/presentation/pages/CreateGroupPage';
 import { ChatInboxPage, WallHistoryPage, DmHistoryPage } from '@features/chat';
+import { EventsListPage, EventDetailPage } from '@features/events';
 import { ProfilePage } from '@features/profile/presentation/pages/ProfilePage';
 import { OnboardingWelcomePage } from '@features/onboarding/presentation/pages/OnboardingWelcomePage';
 import { OnboardingStepOnePage } from '@features/onboarding/presentation/pages/OnboardingStepOnePage';
@@ -109,6 +110,8 @@ export function AppRouter() {
         <Route path="/chat/groups/:groupId/wall" element={<WallHistoryPage />} />
         <Route path="/chat/dm/:conversationId" element={<DmHistoryPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/events" element={<EventsListPage />} />
+        <Route path="/events/:eventId" element={<EventDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/groups" replace />} />

@@ -9,9 +9,10 @@ interface DashboardLayoutProps {
 }
 
 const navItems = [
-  { to: '/groups', label: 'Grupos', icon: 'group' },
-  { to: '/chat', label: 'Mensajes', icon: 'chat' },
   { to: '/profile', label: 'Perfil', icon: 'person' },
+  { to: '/chat', label: 'Mensajes', icon: 'chat' },
+  { to: '/groups', label: 'Grupos', icon: 'group' },
+  { to: '/events', label: 'Eventos', icon: 'event' },
 ];
 
 const getNavLabel = (pathname: string) => {
