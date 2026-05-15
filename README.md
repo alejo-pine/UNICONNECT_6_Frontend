@@ -4,12 +4,12 @@ Ingresa a Mobile:
 cd Mobile
 npm install
 Nota: Si pide fix correr:
-npm run fix
-No correr el npm run fix --force
+npm audit fix
+No correr el npm audit fix --force
 
 Ingresa a Dashboard:
 cd Dashboard
 npm install
 Nota: Si pide fix correr:
-npm run fix
-No correr el npm run fix --force
+npm audit fix
+No correr el npm audit fix --force

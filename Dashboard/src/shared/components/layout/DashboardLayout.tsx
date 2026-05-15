@@ -125,7 +125,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* ── Main area ───────────────────────────────────────────── */}
-      <div className="ml-64 flex flex-1 flex-col min-h-screen">
+      <div className="ml-64 flex flex-1 flex-col h-screen overflow-hidden">
         {/* Top Header */}
         <header
           className="sticky top-0 z-40 flex h-16 items-center justify-between px-8"
@@ -152,7 +152,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-8">{children}</main>
 
         {/* Footer */}
         <footer

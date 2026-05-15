@@ -1,11 +1,11 @@
 import { io, Socket } from 'socket.io-client';
-import type { WallPost } from '../domain/wall';
+import type { DmMessage } from '../domain/dm';
 
 const CHAT_SERVICE_URL =
   (import.meta.env.VITE_CHAT_SERVICE_URL as string | undefined)?.trim().replace(/\/+$/, '') ??
   'http://localhost:3004';
 
-class WallSocketService {
+class DmSocketService {
   private socket: Socket | null = null;
   private readonly url: string;
 
@@ -32,21 +32,21 @@ class WallSocketService {
     }
   }
 
-  joinWall(groupId: string): void {
-    this.socket?.emit('wall:join', { groupId });
+  joinConversation(conversationId: string): void {
+    this.socket?.emit('dm:join', { conversationId });
   }
 
-  leaveWall(groupId: string): void {
-    this.socket?.emit('wall:leave', { groupId });
+  leaveConversation(conversationId: string): void {
+    this.socket?.emit('dm:leave', { conversationId });
   }
 
-  onNewPost(callback: (post: WallPost) => void): void {
-    this.socket?.on('wall:new_post', callback);
+  onNewMessage(callback: (message: DmMessage) => void): void {
+    this.socket?.on('dm:new_message', callback);
   }
 
-  offNewPost(): void {
-    this.socket?.off('wall:new_post');
+  offNewMessage(): void {
+    this.socket?.off('dm:new_message');
   }
 }
 
-export const wallSocket = new WallSocketService(CHAT_SERVICE_URL);
+export const dmSocket = new DmSocketService(CHAT_SERVICE_URL);
