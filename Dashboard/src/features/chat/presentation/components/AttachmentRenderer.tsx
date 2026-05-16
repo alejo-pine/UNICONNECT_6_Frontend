@@ -10,20 +10,26 @@ import {
   type IAttachmentDisplay,
 } from './attachmentDisplayDecorators';
 
+type GetUrlFn = (id: string) => Promise<{ success: boolean; data?: string }>;
+
 interface Props {
   attachment: WallAttachment;
+  getUrl?: GetUrlFn;
 }
 
-export function AttachmentRenderer({ attachment }: Props) {
+export function AttachmentRenderer({
+  attachment,
+  getUrl = (id) => wallHttpService.getAttachmentUrl(id),
+}: Props) {
   const type = getAttachmentDisplayType(attachment.fileType, attachment.fileName);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (type !== 'image' || !attachment.id) return;
-    wallHttpService.getAttachmentUrl(attachment.id).then((res) => {
+    getUrl(attachment.id).then((res) => {
       if (res.success && res.data) setImageUrl(res.data);
     });
-  }, [type, attachment.id]);
+  }, [type, attachment.id, getUrl]);
 
   const openAttachment = async () => {
     if (!attachment.id) return;
@@ -31,7 +37,7 @@ export function AttachmentRenderer({ attachment }: Props) {
       window.open(imageUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    const result = await wallHttpService.getAttachmentUrl(attachment.id);
+    const result = await getUrl(attachment.id);
     if (result.success && result.data) {
       window.open(result.data, '_blank', 'noopener,noreferrer');
     }
