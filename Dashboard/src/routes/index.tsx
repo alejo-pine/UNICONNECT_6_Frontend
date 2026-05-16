@@ -10,6 +10,7 @@ import { GroupDetailPage } from '@features/groups/presentation/pages/GroupDetail
 import { CreateGroupPage } from '@features/groups/presentation/pages/CreateGroupPage';
 import { ChatInboxPage, WallHistoryPage, DmHistoryPage } from '@features/chat';
 import { EventsListPage, EventDetailPage } from '@features/events';
+import { SearchPage, PublicProfilePage } from '@features/search';
 import { ProfilePage } from '@features/profile/presentation/pages/ProfilePage';
 import { OnboardingWelcomePage } from '@features/onboarding/presentation/pages/OnboardingWelcomePage';
 import { OnboardingStepOnePage } from '@features/onboarding/presentation/pages/OnboardingStepOnePage';
@@ -112,6 +113,8 @@ export function AppRouter() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/events" element={<EventsListPage />} />
         <Route path="/events/:eventId" element={<EventDetailPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/search/profile/:profileId" element={<PublicProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/groups" replace />} />
