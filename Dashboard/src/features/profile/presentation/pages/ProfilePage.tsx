@@ -392,6 +392,60 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* ── Statistics & Badges ────────────────────────────── */}
+      {(profile?.statistics || (profile?.badges && profile.badges.length > 0)) && (
+        <div
+          className="rounded-2xl p-8 space-y-6"
+          style={{ background: '#ffffff', border: '1px solid #e3e5ea' }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="material-symbols-outlined" style={{ fontSize: '22px', color: '#D4AF37' }}>military_tech</span>
+            <h2 className="text-lg font-bold font-serif" style={{ color: '#00132a' }}>Estadísticas e Insignias</h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {profile.statistics && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold" style={{ color: '#43474e' }}>Estadísticas de Uso</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl text-center" style={{ background: '#f0f4ff', border: '1px solid #d3e3ff' }}>
+                    <div className="text-2xl font-bold" style={{ color: '#00284D' }}>{profile.statistics.createdGroupsCount}</div>
+                    <div className="text-xs" style={{ color: '#43474e' }}>Grupos Creados</div>
+                  </div>
+                  <div className="p-4 rounded-xl text-center" style={{ background: '#f0f4ff', border: '1px solid #d3e3ff' }}>
+                    <div className="text-2xl font-bold" style={{ color: '#00284D' }}>{profile.statistics.joinedGroupsCount}</div>
+                    <div className="text-xs" style={{ color: '#43474e' }}>Grupos de estudio activos</div>
+                  </div>
+                  <div className="p-4 rounded-xl text-center col-span-2" style={{ background: '#f0f4ff', border: '1px solid #d3e3ff' }}>
+                    <div className="text-2xl font-bold" style={{ color: '#00284D' }}>{profile.statistics.messagesSentCount}</div>
+                    <div className="text-xs" style={{ color: '#43474e' }}>Mensajes Enviados</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {profile.badges && profile.badges.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold" style={{ color: '#43474e' }}>Insignias Desbloqueadas</h3>
+                <div className="flex flex-col gap-3">
+                  {profile.badges.map(badge => (
+                    <div key={badge.id} className="flex items-center gap-4 p-3 rounded-xl" style={{ border: '1px solid #e3e5ea', background: '#fdfdfd' }}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0" style={{ background: '#fff8f7', border: '1px solid #ffdad6' }}>
+                        {badge.icon}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm" style={{ color: '#00132a' }}>{badge.name}</div>
+                        <div className="text-xs" style={{ color: '#73777f' }}>{badge.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Account info ────────────────────────────────────── */}
       <div
         className="rounded-2xl p-8 space-y-3"

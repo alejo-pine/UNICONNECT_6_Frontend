@@ -161,6 +161,46 @@ export const ProfileViewScreen: React.FC<ProfileViewScreenProps> = ({
           />
         </View>
 
+        {(displayProfile.statistics || (displayProfile.badges && displayProfile.badges.length > 0)) && (
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <SectionHeader title="Estadísticas e Insignias" />
+            
+            {displayProfile.statistics && (
+              <View style={styles.statsContainer}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{displayProfile.statistics.createdGroupsCount}</Text>
+                  <Text style={styles.statLabel}>Grupos Creados</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{displayProfile.statistics.joinedGroupsCount}</Text>
+                  <Text style={styles.statLabel}>Grupos Activos</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{displayProfile.statistics.messagesSentCount}</Text>
+                  <Text style={styles.statLabel}>Mensajes</Text>
+                </View>
+              </View>
+            )}
+
+            {displayProfile.badges && displayProfile.badges.length > 0 && (
+              <View style={styles.badgesContainer}>
+                <Text style={styles.badgesTitle}>Insignias Desbloqueadas</Text>
+                {displayProfile.badges.map(badge => (
+                  <View key={badge.id} style={styles.badgeItem}>
+                    <View style={styles.badgeIconContainer}>
+                      <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                    </View>
+                    <View style={styles.badgeInfo}>
+                      <Text style={styles.badgeName}>{badge.name}</Text>
+                      <Text style={styles.badgeDesc}>{badge.description}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <SectionHeader title="Materias Actuales" />
           {subjectsLoading ? (
@@ -243,4 +283,16 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   editButtonText: { fontSize: 14, fontWeight: "700", letterSpacing: 1 },
+  statsContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  statBox: { flex: 1, alignItems: "center", backgroundColor: "#f0f4ff", marginHorizontal: 4, paddingVertical: 12, borderRadius: 8, borderColor: "#d3e3ff", borderWidth: 1 },
+  statValue: { fontSize: 18, fontWeight: "bold", color: "#00284D" },
+  statLabel: { fontSize: 10, color: "#43474e", marginTop: 4, textAlign: "center" },
+  badgesContainer: { marginTop: 8 },
+  badgesTitle: { fontSize: 14, fontWeight: "600", color: "#43474e", marginBottom: 12 },
+  badgeItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#fdfdfd", borderColor: "#e3e5ea", borderWidth: 1, padding: 10, borderRadius: 8, marginBottom: 8 },
+  badgeIconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff8f7", borderColor: "#ffdad6", borderWidth: 1, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  badgeIcon: { fontSize: 20 },
+  badgeInfo: { flex: 1 },
+  badgeName: { fontSize: 14, fontWeight: "bold", color: "#00132a" },
+  badgeDesc: { fontSize: 12, color: "#73777f", marginTop: 2 },
 });
