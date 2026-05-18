@@ -150,7 +150,7 @@ console.log('[profileHttpService] Base URL configurada:', API_BASE_URL);
 export const profileHttpService = {
   async getProfileById(id: string, token: string): Promise<ApiResponse<ProfileData>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/profiles/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/profiles/${id}?vista=completa`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
