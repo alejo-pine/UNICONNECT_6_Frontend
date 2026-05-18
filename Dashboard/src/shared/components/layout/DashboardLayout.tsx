@@ -13,6 +13,7 @@ const navItems = [
   { to: '/chat', label: 'Mensajes', icon: 'chat' },
   { to: '/groups', label: 'Grupos', icon: 'group' },
   { to: '/events', label: 'Eventos', icon: 'event' },
+  { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
 ];
 
 const getNavLabel = (pathname: string) => {
