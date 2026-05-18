@@ -2,19 +2,19 @@ import { API_BASE_URL } from '../api/apiClient';
 
 export interface AppNotification {
   id: string;
-  user_id: string;
+  recipientUserId: string;
   type: string;
   message: string;
-  group_id?: string;
+  groupId?: string;
   read: boolean;
-  created_at: string;
+  createdAt: string;
 }
 
 export const notificationsService = {
-  async getNotifications(token: string): Promise<AppNotification[]> {
+  async getNotifications(token: string, userId: string): Promise<AppNotification[]> {
     try {
-      // Endpoint a definir en el API Gateway / Social Service
-      const response = await fetch(`${API_BASE_URL}/notifications`, {
+      // Send userId as query parameter
+      const response = await fetch(`${API_BASE_URL}/notifications?userId=${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -31,10 +31,10 @@ export const notificationsService = {
       // Dependiendo de cómo responda tu backend (ej. { data: [...] } o simplemente [...])
       const notifications: AppNotification[] = Array.isArray(data) ? data : (data.data || []);
       
-      // Ordenar por created_at descendente y mostrar primero las no leídas (read: false)
+      // Ordenar por createdAt descendente y mostrar primero las no leídas (read: false)
       return notifications.sort((a, b) => {
         if (a.read === b.read) {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
         return a.read ? 1 : -1;
       });

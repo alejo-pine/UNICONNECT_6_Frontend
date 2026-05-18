@@ -290,7 +290,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 export default function TabLayout() {
   const { token } = useAuthStore();
   const router = useRouter();
-
   // 🛑 EL GUARDIÁN INTELIGENTE
   // Solo se ejecuta si esta pantalla está ACTIVA y VISIBLE
   useFocusEffect(

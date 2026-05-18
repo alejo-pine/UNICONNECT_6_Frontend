@@ -17,34 +17,36 @@ import { useAuthStore } from '../store/authStore';
 import { AppNotification, notificationsHttpService } from '../services/notificationsHttpService';
 
 export function NotificationBell() {
-  const { token } = useAuthStore();
+  const { token, userId, notificationRefreshKey, notifications: storeNotifications, setNotifications } = useAuthStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const loadNotifications = useCallback(async () => {
-    if (!token) return;
+    if (!token || !userId) return;
     setLoading(true);
     try {
-      const response = await notificationsHttpService.getNotifications(token);
+      const response = await notificationsHttpService.getNotifications(token, userId);
       if (response.success && response.data) {
         setNotifications(response.data);
       }
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, userId, setNotifications]);
 
   useEffect(() => {
     loadNotifications();
-  }, [loadNotifications]);
+  }, [loadNotifications, notificationRefreshKey]);
+
+  // Derive the displayed notifications from the store (updated by socket in real-time)
+  const notifications = storeNotifications;
 
   const openModal = () => {
     setModalVisible(true);
-    loadNotifications();
+    loadNotifications(); // Full sync when user opens the modal
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 180,
@@ -63,14 +65,14 @@ export function NotificationBell() {
   const handleNotificationPress = async (notification: AppNotification) => {
     if (!notification.read && token) {
       await notificationsHttpService.markAsRead(notification.id, token);
-      setNotifications(prev =>
-        prev.map(n => (n.id === notification.id ? { ...n, read: true } : n))
+      setNotifications(
+        storeNotifications.map(n => (n.id === notification.id ? { ...n, read: true } : n))
       );
     }
     closeModal();
 
-    // Guard: only navigate if we have a real, non-empty group_id
-    const groupId = notification.group_id;
+    // Guard: only navigate if we have a real, non-empty groupId
+    const groupId = notification.groupId;
     if (groupId && groupId.trim().length > 0 && groupId !== 'null' && groupId !== 'undefined') {
       // Small delay so modal close animation finishes before navigation
       setTimeout(() => {
@@ -170,7 +172,7 @@ export function NotificationBell() {
                           >
                             {n.message}
                           </Text>
-                          <Text style={styles.itemTime}>{formatTime(n.created_at)}</Text>
+                          <Text style={styles.itemTime}>{formatTime(n.createdAt)}</Text>
                         </View>
                         {!n.read && <View style={styles.dot} />}
                       </TouchableOpacity>

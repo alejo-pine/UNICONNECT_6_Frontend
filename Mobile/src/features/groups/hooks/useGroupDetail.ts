@@ -1,16 +1,14 @@
-/**
- * Hook para obtener el detalle de un grupo de estudio
- */
-
 import { useAuthStore } from '@/src/store/authStore';
+import { SOCKET_BASE_URL } from '@/src/config/api';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { groupsHttpService } from '../services/groupsHttpService';
 import { subjectsHttpService } from '../services/subjectsHttpService';
+import { profileHttpService } from '@/src/services/profileHttpService';
 import type { StudyGroup } from '../types/groups';
 import { io } from 'socket.io-client';
 
-const realtimeSocketUrl = process.env.BACKEND_PUBLIC_URL || 'http://10.0.2.2:3000';
+const realtimeSocketUrl = SOCKET_BASE_URL;
 
 const toUserIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -39,7 +37,10 @@ interface UseGroupDetailReturn {
   reload: () => Promise<void>;
   joinGroup: () => Promise<{ success: boolean; error?: string }>;
   leaveGroup: () => Promise<{ success: boolean; error?: string }>;
-  transferAdmin: (toUserId: string) => Promise<{ success: boolean; error?: string }>;
+  transferAdminAndLeave: (newAdminUserId: string) => Promise<{ success: boolean; error?: string }>;
+  respondTransferAdmin: (action: 'accept' | 'reject') => Promise<{ success: boolean; error?: string }>;
+  acceptRequest: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  rejectRequest: (userId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
@@ -159,12 +160,52 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
 
         if (subjectId && resolvedName) {
           enrichedGroup = {
-            ...groupData,
+            ...enrichedGroup,
             subject: {
               id: subjectId,
               name: resolvedName,
             },
           };
+        }
+
+        // Fetch profiles for members
+        if (enrichedGroup.members && enrichedGroup.members.length > 0) {
+          const membersWithProfile = await Promise.all(
+            enrichedGroup.members.map(async (member) => {
+              if (member.name && member.name !== 'Estudiante') return member;
+              const profileRes = await profileHttpService.getProfileById(member.id, token);
+              if (profileRes.success && profileRes.data) {
+                return {
+                  ...member,
+                  name: (profileRes.data as any).full_name ?? profileRes.data.name ?? member.name,
+                  email: profileRes.data.email ?? member.email,
+                  avatarUrl: profileRes.data.avatar_url ?? member.avatarUrl,
+                };
+              }
+              return member;
+            })
+          );
+          enrichedGroup.members = membersWithProfile;
+        }
+
+        // Fetch profiles for pendingRequests
+        if (enrichedGroup.pendingRequests && enrichedGroup.pendingRequests.length > 0) {
+          const pendingWithProfile = await Promise.all(
+            enrichedGroup.pendingRequests.map(async (member) => {
+              if (member.name && member.name !== 'Estudiante') return member;
+              const profileRes = await profileHttpService.getProfileById(member.id, token);
+              if (profileRes.success && profileRes.data) {
+                return {
+                  ...member,
+                  name: (profileRes.data as any).full_name ?? profileRes.data.name ?? member.name,
+                  email: profileRes.data.email ?? member.email,
+                  avatarUrl: profileRes.data.avatar_url ?? member.avatarUrl,
+                };
+              }
+              return member;
+            })
+          );
+          enrichedGroup.pendingRequests = pendingWithProfile;
         }
 
         await persistCache();
@@ -230,7 +271,7 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
           if (!prev) return prev;
           return {
             ...prev,
-            members: hasMembers ? nextMembers : prev.members,
+            members: hasMembers ? nextMembers.map(id => ({ id })) : prev.members,
             member_count: hasMembers ? nextMembers.length : prev.member_count,
           };
         });
@@ -239,6 +280,16 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
         void reload();
       }
     });
+
+    const handleTransferEvent = (payload: { groupId: string }) => {
+      if (payload.groupId === groupId) {
+        void reload();
+      }
+    };
+
+    socket.on('admin_transfer_requested', handleTransferEvent);
+    socket.on('admin_transfer_accepted', handleTransferEvent);
+    socket.on('admin_transfer_rejected', handleTransferEvent);
 
     if (socket.connected) {
       socket.emit('study-group:join', { groupId });
@@ -323,38 +374,82 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     }
   }, [groupId, reload, token]);
 
-  const transferAdmin = useCallback(async (toUserId: string): Promise<{ success: boolean; error?: string }> => {
-    if (!token || !groupId) {
-      return { success: false, error: 'Se requieren credenciales válidas' };
-    }
 
+
+  const transferAdminAndLeave = useCallback(async (newAdminUserId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !groupId) return { success: false, error: 'Se requieren credenciales válidas' };
     try {
-      if (isMountedRef.current) {
-        setLoading(true);
-        setError(null);
-      }
-
-      const response = await groupsHttpService.transferAdmin(groupId, toUserId, token);
+      if (isMountedRef.current) { setLoading(true); setError(null); }
+      const response = await groupsHttpService.transferAdminAndLeave(groupId, newAdminUserId, token);
       if (!response.success) {
-        if (isMountedRef.current) {
-          setError(response.error || 'No se pudo transferir la administración');
-        }
+        if (isMountedRef.current) setError(response.error || 'No se pudo transferir la administración');
         return { success: false, error: response.error };
       }
-
       return { success: true };
     } catch (err) {
-      console.error('[useGroupDetail] Error transferring admin:', err);
-      if (isMountedRef.current) {
-        setError('No se pudo transferir la administración');
-      }
+      if (isMountedRef.current) setError('No se pudo transferir la administración');
       return { success: false, error: 'No se pudo transferir la administración' };
     } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
+      if (isMountedRef.current) setLoading(false);
     }
   }, [groupId, token]);
 
-  return { group, loading, error, reload, joinGroup, leaveGroup, transferAdmin };
+  const respondTransferAdmin = useCallback(async (action: 'accept' | 'reject'): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !groupId) return { success: false, error: 'Se requieren credenciales válidas' };
+    try {
+      if (isMountedRef.current) { setLoading(true); setError(null); }
+      const response = await groupsHttpService.respondTransferAdmin(groupId, action, token);
+      if (!response.success) {
+        if (isMountedRef.current) setError(response.error || 'No se pudo responder a la transferencia');
+        return { success: false, error: response.error };
+      }
+      await reload();
+      return { success: true };
+    } catch (err) {
+      if (isMountedRef.current) setError('No se pudo responder a la transferencia');
+      return { success: false, error: 'No se pudo responder a la transferencia' };
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
+  }, [groupId, reload, token]);
+
+  const acceptRequest = useCallback(async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !groupId) return { success: false, error: 'Se requieren credenciales válidas' };
+    try {
+      if (isMountedRef.current) { setLoading(true); setError(null); }
+      const response = await groupsHttpService.acceptRequest(groupId, userId, token);
+      if (!response.success) {
+        if (isMountedRef.current) setError(response.error || 'No se pudo aceptar la solicitud');
+        return { success: false, error: response.error };
+      }
+      await reload();
+      return { success: true };
+    } catch (err) {
+      if (isMountedRef.current) setError('No se pudo aceptar la solicitud');
+      return { success: false, error: 'No se pudo aceptar la solicitud' };
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
+  }, [groupId, reload, token]);
+
+  const rejectRequest = useCallback(async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !groupId) return { success: false, error: 'Se requieren credenciales válidas' };
+    try {
+      if (isMountedRef.current) { setLoading(true); setError(null); }
+      const response = await groupsHttpService.rejectRequest(groupId, userId, token);
+      if (!response.success) {
+        if (isMountedRef.current) setError(response.error || 'No se pudo rechazar la solicitud');
+        return { success: false, error: response.error };
+      }
+      await reload();
+      return { success: true };
+    } catch (err) {
+      if (isMountedRef.current) setError('No se pudo rechazar la solicitud');
+      return { success: false, error: 'No se pudo rechazar la solicitud' };
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
+  }, [groupId, reload, token]);
+
+  return { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest };
 };

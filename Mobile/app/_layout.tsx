@@ -15,6 +15,7 @@ import {
   OnboardingApiError,
 } from '../src/features/onboarding/services/onboardingService';
 import { useAuthStore } from '../src/store/authStore';
+import { GlobalSocketNotifications } from '../src/components/GlobalSocketNotifications';
 
 export default function RootLayout() {
   const segments = useSegments();
@@ -220,6 +221,7 @@ export default function RootLayout() {
         <Stack.Screen name="expo-auth-session" />
         <Stack.Screen name="profile" />
       </Stack>
+      <GlobalSocketNotifications />
     </AppErrorBoundary>
   );
 }

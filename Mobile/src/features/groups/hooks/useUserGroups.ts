@@ -3,6 +3,7 @@
  */
 
 import { useAuthStore } from '@/src/store/authStore';
+import { SOCKET_BASE_URL } from '@/src/config/api';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { io } from 'socket.io-client';
@@ -22,7 +23,7 @@ interface AdminTransferRequestedPayload {
   toUserId: string;
 }
 
-const realtimeSocketUrl = process.env.BACKEND_PUBLIC_URL || 'http://10.0.2.2:3000';
+const realtimeSocketUrl = SOCKET_BASE_URL;
 
 const toUserIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -254,11 +255,14 @@ export const useUserGroups = (options: UseUserGroupsOptions = {}): UseUserGroups
     const handleStudyGroupUpdated = (payload: StudyGroupRealtimePayload) => {
       const hasMembers = Array.isArray(payload.members);
       const hasPending = Array.isArray(payload.pendingRequests);
-      const nextMembers = hasMembers ? toUserIds(payload.members) : [];
-      const nextPendingRequests = hasPending ? toUserIds(payload.pendingRequests) : [];
+      const nextMemberIds = hasMembers ? toUserIds(payload.members) : [];
+      const nextPendingIds = hasPending ? toUserIds(payload.pendingRequests) : [];
+      // Map to GroupUser shape so the type matches StudyGroup.members/pendingRequests
+      const nextMembers = nextMemberIds.map((id) => ({ id }));
+      const nextPendingRequests = nextPendingIds.map((id) => ({ id }));
 
       setAllGroups((currentGroups) =>
-        currentGroups.map((group) => {
+        currentGroups.map((group): StudyGroup => {
           if (group.id !== payload.groupId) return group;
           return {
             ...group,

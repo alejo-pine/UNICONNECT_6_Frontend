@@ -9,12 +9,16 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 
 import { groupsColors } from '../constants/colors';
 import { useGroupDetail } from '../hooks/useGroupDetail';
 import type { GroupUser } from '../types/groups';
+import { useAuthStore } from '@/src/store/authStore';
 
 const colors = groupsColors;
 
@@ -27,23 +31,69 @@ type RouteParams = {
   isMember?: string;
 };
 
-const MemberRow = ({ member }: { member: GroupUser }) => (
+const MemberRow = ({
+  member,
+  isPending = false,
+  showAdminTransfer = false,
+  onAccept,
+  onReject,
+  onTransferAdmin,
+  isAdminMember = false,
+}: {
+  member: GroupUser;
+  isPending?: boolean;
+  showAdminTransfer?: boolean;
+  onAccept?: (id: string) => void;
+  onReject?: (id: string) => void;
+  onTransferAdmin?: (id: string) => void;
+  isAdminMember?: boolean;
+}) => (
   <View style={styles.memberRow}>
-    <View style={[styles.memberAvatar, { backgroundColor: colors.primary }]}>
-      <Text style={styles.memberAvatarText}>
-        {(member.name ?? member.email ?? '?').charAt(0).toUpperCase()}
-      </Text>
-    </View>
+    {member.avatarUrl ? (
+      <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatar} />
+    ) : (
+      <View style={[styles.memberAvatar, { backgroundColor: colors.primary }]}>
+        <Text style={styles.memberAvatarText}>
+          {(member.name ?? member.email ?? '?').charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    )}
     <View style={styles.memberInfo}>
-      <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-        {member.name ?? 'Estudiante'}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+          {member.name ?? 'Estudiante'}
+        </Text>
+        {isAdminMember && (
+          <View style={styles.adminBadgeSmall}>
+            <Text style={styles.adminBadgeSmallText}>Admin</Text>
+          </View>
+        )}
+      </View>
       {member.email ? (
         <Text style={[styles.memberEmail, { color: colors.label }]} numberOfLines={1}>
           {member.email}
         </Text>
       ) : null}
     </View>
+    {isPending && (
+      <View style={styles.rowActions}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => onAccept?.(member.id)}>
+          <MaterialIcons name="check-circle" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconButton} onPress={() => onReject?.(member.id)}>
+          <MaterialIcons name="cancel" size={24} color={colors.danger} />
+        </TouchableOpacity>
+      </View>
+    )}
+    {!isPending && showAdminTransfer && (
+      <TouchableOpacity
+        style={styles.transferBtn}
+        onPress={() => onTransferAdmin?.(member.id)}
+      >
+        <MaterialIcons name="admin-panel-settings" size={18} color="#FFF" />
+        <Text style={styles.transferBtnText}>Hacer Admin</Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
@@ -56,18 +106,68 @@ export function GroupManagementScreen() {
   const paramSubject = params.subjectName ? decodeURIComponent(params.subjectName) : '';
   const paramDescription = params.description ? decodeURIComponent(params.description) : '';
 
-  const { group, loading, error, reload, joinGroup, leaveGroup } = useGroupDetail(groupId);
+  const { userId } = useAuthStore();
+  const { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest } = useGroupDetail(groupId);
 
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'files'>('members');
 
   const displayName = group?.name ?? paramName ?? 'Grupo';
   const displaySubject = group?.subject?.name ?? paramSubject ?? '';
   const displayDescription = group?.description ?? paramDescription ?? '';
-  const isAdmin = group?.is_admin ?? false;
-  const isMember = group?.is_member ?? false;
-  const memberCount = group?.member_count ?? group?.members?.length ?? 0;
+  
   const members: GroupUser[] = group?.members ?? [];
   const pendingRequests: GroupUser[] = group?.pendingRequests ?? [];
+  
+  const routeIsAdmin = params.isAdmin === 'true';
+  const routeIsMember = params.isMember === 'true';
+
+  const isAdmin = group?.is_admin || (group?.creator_id && group?.creator_id === userId) || routeIsAdmin || false;
+  const isMember = group?.is_member || members.some((m) => m.id === userId) || routeIsMember || false;
+  const hasRequested = pendingRequests.some((m) => m.id === userId) || false;
+  const memberCount = group?.member_count ?? group?.members?.length ?? 0;
+  const pendingAdminTransfer = group?.pendingAdminTransfer;
+
+  const handleAcceptRequest = useCallback(async (id: string) => {
+    setActionLoading(true);
+    const result = await acceptRequest(id);
+    setActionLoading(false);
+    if (!result.success) Alert.alert('Error', result.error ?? 'No se pudo aceptar la solicitud');
+  }, [acceptRequest]);
+
+  const handleRejectRequest = useCallback(async (id: string) => {
+    setActionLoading(true);
+    const result = await rejectRequest(id);
+    setActionLoading(false);
+    if (!result.success) Alert.alert('Error', result.error ?? 'No se pudo rechazar la solicitud');
+  }, [rejectRequest]);
+
+  const handleTransferAdmin = useCallback((id: string, name?: string) => {
+    Alert.alert(
+      'Transferir Administración',
+      `¿Estás seguro de transferir la administración a ${name ?? 'este usuario'}? Perderás tus privilegios y saldrás del grupo si lo deseas o te quedarás como miembro según la política.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Transferir', style: 'destructive', onPress: async () => {
+            setActionLoading(true);
+            const result = await transferAdminAndLeave(id);
+            setActionLoading(false);
+            if (!result.success) Alert.alert('Error', result.error ?? 'No se pudo transferir');
+            else {
+              Alert.alert('Éxito', 'Transferencia de administración iniciada.');
+            }
+          }
+        }
+      ]
+    );
+  }, [transferAdminAndLeave]);
+
+  const handleRespondTransfer = useCallback(async (action: 'accept' | 'reject') => {
+    setActionLoading(true);
+    const result = await respondTransferAdmin(action);
+    setActionLoading(false);
+    if (!result.success) Alert.alert('Error', result.error ?? 'No se pudo responder');
+  }, [respondTransferAdmin]);
 
   const handleJoin = useCallback(async () => {
     setActionLoading(true);
@@ -79,6 +179,15 @@ export function GroupManagementScreen() {
   }, [joinGroup]);
 
   const handleLeave = useCallback(() => {
+    if (isAdmin) {
+      Alert.alert(
+        'Transferir Administración',
+        'Eres el administrador del grupo. Debes transferir la administración a otro miembro antes de poder salir. Selecciona a un miembro de la lista usando el botón "Hacer Admin".',
+        [{ text: 'Entendido', onPress: () => setActiveTab('members') }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Salir del grupo',
       `¿Estás seguro de que quieres salir de "${displayName}"?`,
@@ -132,7 +241,17 @@ export function GroupManagementScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading && !!group}
+            onRefresh={reload}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
+        <Stack.Screen options={{ title: displayName }} />
+
         {/* Info Card */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={[styles.groupIconContainer, { backgroundColor: colors.primary }]}>
@@ -175,7 +294,7 @@ export function GroupManagementScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          {!isMember && !isAdmin && (
+          {!isMember && !isAdmin && !hasRequested && (
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
               onPress={handleJoin}
@@ -193,7 +312,16 @@ export function GroupManagementScreen() {
             </TouchableOpacity>
           )}
 
-          {isMember && !isAdmin && (
+          {!isMember && !isAdmin && hasRequested && (
+            <View style={[styles.adminBadgeContainer, { backgroundColor: '#F3F4F6' }]}>
+              <MaterialIcons name="access-time" size={18} color={colors.label} />
+              <Text style={[styles.adminBadgeText, { color: colors.label }]}>
+                Solicitud pendiente de aprobación
+              </Text>
+            </View>
+          )}
+
+          {(isMember || isAdmin) && (
             <TouchableOpacity
               style={[styles.actionButton, styles.dangerButton]}
               onPress={handleLeave}
@@ -221,29 +349,99 @@ export function GroupManagementScreen() {
               </Text>
             </View>
           )}
+
+          {pendingAdminTransfer && pendingAdminTransfer.status === 'pending' && pendingAdminTransfer.toUserId === userId && (
+            <View style={[styles.card, { backgroundColor: '#FFF4E5', borderColor: '#FFB020', borderWidth: 1, marginTop: 16 }]}>
+              <Text style={[styles.sectionTitle, { color: '#B27B16' }]}>Transferencia de Administración</Text>
+              <Text style={{ color: '#B27B16', marginBottom: 12 }}>El administrador actual te ha invitado a ser el nuevo administrador del grupo.</Text>
+              <View style={styles.rowActions}>
+                <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]} onPress={() => handleRespondTransfer('accept')}>
+                  <Text style={styles.actionButtonText}>Aceptar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionButton, styles.dangerButton, { flex: 1 }]} onPress={() => handleRespondTransfer('reject')}>
+                  <Text style={[styles.actionButtonText, { color: colors.danger }]}>Rechazar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {pendingAdminTransfer && pendingAdminTransfer.status === 'pending' && pendingAdminTransfer.fromUserId === userId && (
+            <View style={[styles.card, { backgroundColor: '#EEF2FF', marginTop: 16 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.primary }]}>Transferencia en progreso</Text>
+              <Text style={{ color: colors.primary }}>Has solicitado transferir la administración. Esperando respuesta.</Text>
+            </View>
+          )}
         </View>
 
-        {/* Members List */}
-        {members.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Miembros ({members.length})
-            </Text>
-            {members.map((member) => (
-              <MemberRow key={member.id} member={member} />
-            ))}
+        {/* Tabs Selection */}
+        {(isMember || isAdmin) && (
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'members' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('members')}
+            >
+              <Text style={[styles.tabText, activeTab === 'members' && styles.tabTextActive]}>Miembros</Text>
+            </TouchableOpacity>
+            
+            {isAdmin && (
+              <TouchableOpacity 
+                style={[styles.tabButton, activeTab === 'requests' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('requests')}
+              >
+                <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>Solicitudes</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'files' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('files')}
+            >
+              <Text style={[styles.tabText, activeTab === 'files' && styles.tabTextActive]}>Archivos</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Pending Requests — admin only */}
-        {isAdmin && pendingRequests.length > 0 && (
+        {/* Tab Content */}
+        {activeTab === 'members' && (isMember || isAdmin) && (
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Solicitudes pendientes ({pendingRequests.length})
-            </Text>
-            {pendingRequests.map((member) => (
-              <MemberRow key={member.id} member={member} />
-            ))}
+            {members.length === 0 ? (
+              <Text style={styles.emptyText}>No hay miembros en este grupo.</Text>
+            ) : (
+              members.map((member) => (
+                <MemberRow 
+                  key={member.id} 
+                  member={member} 
+                  isAdminMember={member.id === group?.creator_id}
+                  showAdminTransfer={isAdmin && member.id !== userId && (!pendingAdminTransfer || pendingAdminTransfer.status !== 'pending')}
+                  onTransferAdmin={(id) => handleTransferAdmin(id, member.name)}
+                />
+              ))
+            )}
+          </View>
+        )}
+
+        {activeTab === 'requests' && isAdmin && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            {pendingRequests.length === 0 ? (
+              <Text style={styles.emptyText}>No hay solicitudes pendientes.</Text>
+            ) : (
+              pendingRequests.map((member) => (
+                <MemberRow 
+                  key={member.id} 
+                  member={member} 
+                  isPending={true}
+                  onAccept={handleAcceptRequest}
+                  onReject={handleRejectRequest}
+                />
+              ))
+            )}
+          </View>
+        )}
+
+        {activeTab === 'files' && (isMember || isAdmin) && (
+          <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 40, alignItems: 'center' }]}>
+            <MaterialIcons name="folder-open" size={48} color={colors.border} />
+            <Text style={[styles.emptyText, { marginTop: 12 }]}>Los archivos del grupo estarán disponibles pronto.</Text>
           </View>
         )}
       </ScrollView>
@@ -255,19 +453,6 @@ export function GroupManagementScreen() {
       style={[styles.container, { backgroundColor: colors.lightBg }]}
       edges={['left', 'right', 'bottom']}
     >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.primary }]} numberOfLines={1}>
-          {displayName}
-        </Text>
-        <TouchableOpacity onPress={reload} style={styles.backButton} activeOpacity={0.7}>
-          <MaterialIcons name="refresh" size={22} color={loading ? colors.border : colors.label} />
-        </TouchableOpacity>
-      </View>
-
       {renderContent()}
     </SafeAreaView>
   );
@@ -460,5 +645,68 @@ const styles = StyleSheet.create({
   memberEmail: {
     fontSize: 12,
     marginTop: 2,
+  },
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  transferBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  transferBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  adminBadgeSmall: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  adminBadgeSmallText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.label,
+  },
+  tabTextActive: {
+    color: colors.primary,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: colors.label,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });

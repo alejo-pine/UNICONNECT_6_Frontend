@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2, Bell, BellOff, CheckCircle2 } from 'lucide-react';
 import { useEventDetail } from '../hooks/useEventDetail';
+import { useEventSubscription } from '../hooks/useEventSubscription';
 
 const formatDate = (dateValue: string): string => {
   const date = new Date(`${dateValue}T00:00:00`);
@@ -50,6 +51,7 @@ export function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const { event, loading, error, retry } = useEventDetail(eventId);
+  const { isSubscribed, toggleSubscription, loadingCategory } = useEventSubscription();
 
   if (loading) {
     return (
@@ -81,6 +83,10 @@ export function EventDetailPage() {
       </div>
     );
   }
+
+  const category = event.category?.trim();
+  const categorySubscribed = category ? isSubscribed(category) : false;
+  const categoryLoading = category ? loadingCategory === category : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -114,8 +120,35 @@ export function EventDetailPage() {
         </div>
       )}
 
-      {/* Title */}
-      <h2 className="text-2xl font-bold leading-tight text-[#00284D]">{event.title}</h2>
+      {/* Title + subscribe button */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-2xl font-bold leading-tight text-[#00284D]">{event.title}</h2>
+        {category && (
+          <button
+            id={`subscribe-category-detail-${category.toLowerCase().replace(/\s/g, '-')}`}
+            type="button"
+            onClick={() => void toggleSubscription(category)}
+            disabled={categoryLoading}
+            title={categorySubscribed ? `Desuscribirse de "${category}"` : `Suscribirse a "${category}"`}
+            className={[
+              'flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all',
+              categorySubscribed
+                ? 'bg-[#00284D] text-white hover:bg-[#003a6b]'
+                : 'border border-slate-200 bg-white text-slate-600 hover:border-[#00284D] hover:text-[#00284D]',
+              categoryLoading ? 'opacity-60 cursor-not-allowed' : '',
+            ].join(' ')}
+          >
+            {categoryLoading ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : categorySubscribed ? (
+              <CheckCircle2 size={12} />
+            ) : (
+              <BellOff size={12} />
+            )}
+            {categorySubscribed ? `Suscrito a "${category}"` : `Suscribirse a "${category}"`}
+          </button>
+        )}
+      </div>
 
       {/* Info grid */}
       <div className="grid gap-3 sm:grid-cols-2">

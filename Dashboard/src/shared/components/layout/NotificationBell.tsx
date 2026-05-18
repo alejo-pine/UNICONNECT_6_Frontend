@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuthStore } from '@shared/store/authStore';
 import { notificationsService, type AppNotification } from '../../services/notifications/notificationsService';
 import { useGlobalSocketNotifications } from '../../hooks/useGlobalSocketNotifications';
@@ -8,25 +8,29 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.userId);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const loadNotifications = async () => {
-    if (!token) return;
-    const data = await notificationsService.getNotifications(token);
+  const loadNotifications = useCallback(async () => {
+    if (!token || !userId) return;
+    const data = await notificationsService.getNotifications(token, userId);
     setNotifications(data);
-  };
+  }, [token, userId]);
 
   // Carga inicial
   useEffect(() => {
     void loadNotifications();
-  }, [token]);
+  }, [loadNotifications]);
+
+  // Stable callback for socket — recreated only when loadNotifications changes
+  const handleSocketNotification = useCallback(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
 
   // Escuchar notificaciones por WebSockets
-  useGlobalSocketNotifications(() => {
-    // Cuando llega un evento socket, recargamos la tabla de notificaciones
-    void loadNotifications();
-  });
+  useGlobalSocketNotifications(handleSocketNotification);
+
 
   // Cerrar dropdown al hacer click afuera
   useEffect(() => {
@@ -53,8 +57,8 @@ export function NotificationBell() {
     setIsOpen(false);
     
     // Navegar al grupo si aplica
-    if (notification.group_id) {
-      navigate(`/groups/${notification.group_id}`);
+    if (notification.groupId) {
+      navigate(`/groups/${notification.groupId}`);
     }
   };
 
@@ -107,7 +111,7 @@ export function NotificationBell() {
                         {notification.message}
                       </p>
                       <p className="text-xs text-ink-500 mt-1">
-                        {new Date(notification.created_at).toLocaleString()}
+                        {new Date(notification.createdAt).toLocaleString()}
                       </p>
                     </button>
                   </li>
