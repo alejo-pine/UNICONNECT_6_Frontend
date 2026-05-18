@@ -56,6 +56,11 @@ export interface StudyGroup {
   is_admin: boolean;
   members?: GroupUser[];
   pendingRequests?: GroupUser[];
+  pendingAdminTransfer?: {
+    fromUserId: string;
+    toUserId: string;
+    status: 'pending' | 'accepted' | 'rejected';
+  };
 }
 
 /**

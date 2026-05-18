@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
+import type { AppNotification } from '../services/notificationsHttpService';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const AUTH_USER_ID_KEY = 'auth_user_id';
@@ -9,6 +10,8 @@ interface AuthState {
   userId: string | null;
   token: string | null;
   profileRefreshKey: number;
+  notificationRefreshKey: number;
+  notifications: AppNotification[];
   needsOnboarding: boolean | null;
   onboardingResolved: boolean;
   needsCompleteProfile: boolean;
@@ -21,6 +24,9 @@ interface AuthState {
   setNeedsCompleteProfile: (value: boolean) => void;
   markProfileAsComplete: () => void;
   triggerProfileRefresh: () => void;
+  triggerNotificationRefresh: () => void;
+  addNotification: (notification: AppNotification) => void;
+  setNotifications: (notifications: AppNotification[]) => void;
   hydrateSession: () => Promise<void>;
   clearSession: () => Promise<void>;
 }
@@ -29,6 +35,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   userId: null,
   token: null,
   profileRefreshKey: 0,
+  notificationRefreshKey: 0,
+  notifications: [],
   needsOnboarding: null,
   onboardingResolved: false,
   needsCompleteProfile: false,
@@ -79,6 +87,21 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   triggerProfileRefresh: () => {
     set((state) => ({ profileRefreshKey: state.profileRefreshKey + 1 }));
+  },
+
+  triggerNotificationRefresh: () => {
+    set((state) => ({ notificationRefreshKey: state.notificationRefreshKey + 1 }));
+  },
+
+  addNotification: (notification: AppNotification) => {
+    set((state) => ({
+      notifications: [notification, ...state.notifications.filter(n => n.id !== notification.id)],
+      notificationRefreshKey: state.notificationRefreshKey + 1,
+    }));
+  },
+
+  setNotifications: (notifications: AppNotification[]) => {
+    set({ notifications });
   },
 
   hydrateSession: async () => {

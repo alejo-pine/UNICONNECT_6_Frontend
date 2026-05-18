@@ -2,7 +2,7 @@ import { colors } from "@/src/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -11,9 +11,13 @@ import {
     Text,
     TouchableOpacity,
     View,
+    ScrollView,
+    Alert
 } from "react-native";
 import { useEventsFeed } from "../hooks/useEventsFeed";
+import { useEventSubscription } from "../hooks/useEventSubscription";
 import type { EventCardSummary } from "../types/events";
+import { CreateEventModal } from "../components/CreateEventModal";
 
 const formatDate = (dateValue: string): string => {
   const date = new Date(`${dateValue}T00:00:00`);
@@ -105,10 +109,13 @@ function EventCard({
   );
 }
 
+const CATEGORIES = ["Académico", "Deportivo", "Cultural", "Social"];
+
 export const EventsScreen: React.FC = () => {
   const router = useRouter();
-  const { events, isLoading, isRefreshing, error, hasEvents, refreshEvents } =
-    useEventsFeed(20);
+  const { events, isLoading, isRefreshing, error, hasEvents, refreshEvents } = useEventsFeed(20);
+  const { subscribedCategories, loadingInit, isSubscribed, subscribe, unsubscribe, isSubmitting } = useEventSubscription();
+  const [isCreateModalVisible, setCreateModalVisible] = useState(false);
 
   const handleOpenEvent = useCallback(
     (eventId: string) => {
@@ -116,6 +123,22 @@ export const EventsScreen: React.FC = () => {
     },
     [router],
   );
+
+  const toggleSubscription = async (category: string) => {
+    if (isSubscribed(category)) {
+      const success = await unsubscribe(category);
+      if (!success) {
+        Alert.alert("Error", "No se pudo cancelar la suscripción");
+      }
+    } else {
+      const success = await subscribe(category);
+      if (success) {
+        Alert.alert("Suscrito", `Te has suscrito a eventos de categoría ${category}`);
+      } else {
+        Alert.alert("Error", "No se pudo suscribir a la categoría");
+      }
+    }
+  };
 
   if (isLoading) {
     return (
@@ -142,10 +165,62 @@ export const EventsScreen: React.FC = () => {
     );
   }
 
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerTopRow}>
+        <View>
+          <Text style={styles.headerTitle}>Eventos</Text>
+          <Text style={styles.headerSubtitle}>
+            Mantente al día con los eventos de UniConnect
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => setCreateModalVisible(true)}
+        >
+          <Ionicons name="add" size={20} color="#FFF" />
+          <Text style={styles.createButtonText}>Crear</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <Text style={styles.categoriesTitle}>Suscríbete a Categorías:</Text>
+      {loadingInit ? (
+        <View style={styles.categoriesLoaderContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.categoriesLoaderText}>Cargando categorías...</Text>
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+          {CATEGORIES.map((category) => {
+            const subscribed = isSubscribed(category);
+            return (
+              <TouchableOpacity
+                key={category}
+                style={[styles.categoryBadge, subscribed && styles.categoryBadgeSubscribed]}
+                onPress={() => toggleSubscription(category)}
+                disabled={isSubmitting}
+              >
+                <Ionicons 
+                  name={subscribed ? "notifications" : "notifications-outline"} 
+                  size={14} 
+                  color={subscribed ? "#FFF" : colors.primary} 
+                />
+                <Text style={[styles.categoryText, subscribed && styles.categoryTextSubscribed]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+
   if (!hasEvents) {
     return (
       <View style={styles.centerState}>
-        <Ionicons name="calendar-clear-outline" size={36} color={colors.gold} />
+        {renderHeader()}
+        <Ionicons name="calendar-clear-outline" size={36} color={colors.gold} style={{ marginTop: 20 }} />
         <Text style={styles.centerStateTitle}>No hay eventos por ahora</Text>
         <Text style={styles.centerStateText}>
           Cuando se publiquen eventos aparecerán aquí.
@@ -155,26 +230,29 @@ export const EventsScreen: React.FC = () => {
   }
 
   return (
-    <FlatList
-      data={events}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={refreshEvents} />
-      }
-      ListHeaderComponent={
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Eventos</Text>
-          <Text style={styles.headerSubtitle}>
-            Mantente al día con los eventos de UniConnect
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <EventCard event={item} onPress={handleOpenEvent} />
-      )}
-    />
+    <>
+      <FlatList
+        data={events}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={refreshEvents} />
+        }
+        ListHeaderComponent={renderHeader()}
+        renderItem={({ item }) => (
+          <EventCard event={item} onPress={handleOpenEvent} />
+        )}
+      />
+      <CreateEventModal
+        visible={isCreateModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSuccess={() => {
+          setCreateModalVisible(false);
+          refreshEvents();
+        }}
+      />
+    </>
   );
 };
 
@@ -187,6 +265,25 @@ const styles = StyleSheet.create({
   headerContainer: {
     marginBottom: 14,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  createButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  createButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
   headerTitle: {
     color: colors.primary,
     fontSize: 24,
@@ -196,6 +293,49 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 13,
     marginTop: 2,
+    marginBottom: 12,
+  },
+  categoriesTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  categoriesScroll: {
+    gap: 8,
+    paddingBottom: 8,
+  },
+  categoriesLoaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  categoriesLoaderText: {
+    color: '#64748B',
+    fontSize: 13,
+  },
+  categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  categoryBadgeSubscribed: {
+    backgroundColor: colors.primary,
+  },
+  categoryText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  categoryTextSubscribed: {
+    color: "#FFF",
   },
   card: {
     borderRadius: 14,

@@ -1,22 +1,27 @@
 import { useAuthStore } from '@/src/store/authStore';
+import { SOCKET_BASE_URL } from '@/src/config/api';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
-import { groupsHttpService } from '@/src/features/groups/services/groupsHttpService';
 
-const realtimeSocketUrl = process.env.BACKEND_PUBLIC_URL || 'http://10.0.2.2:3000';
+const realtimeSocketUrl = SOCKET_BASE_URL;
 
-interface DomainEventPayload {
-  type: 'SOLICITUD_INGRESO' | 'MIEMBRO_ACEPTADO' | 'MIEMBRO_RECHAZADO' | 'TRANSFERENCIA_ADMIN';
-  groupId: string;
-  actorUserId: string;
-  data: any;
-  timestamp: string;
+interface NotificationPayload {
+  id: string;
+  recipientUserId: string;
+  title: string;
+  message: string;
+  type: string;
+  groupId?: string;
+  read: boolean;
+  createdAt: string;
 }
 
-export function GlobalSocketNotifications() {
-  const { userId, token } = useAuthStore();
+interface Props {}
+
+export function GlobalSocketNotifications(_props: Props) {
+  const { userId, token, addNotification } = useAuthStore();
   const socketRef = useRef<Socket | null>(null);
   const router = useRouter();
 
@@ -24,93 +29,73 @@ export function GlobalSocketNotifications() {
     if (!token || !userId) return;
 
     const socket = io(realtimeSocketUrl, {
-      auth: {
-        'x-user-id': userId,
-        Authorization: `Bearer ${token}`,
-      },
-      transports: ['websocket', 'polling'],
+      path: '/notifications-socket/',
+      query: { userId },
+      auth: { 'x-user-id': userId, Authorization: `Bearer ${token}` },
+      // polling first so Socket.IO handshakes via HTTP before upgrading to WS
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+      reconnectionAttempts: 10,
     });
 
     socketRef.current = socket;
 
-    const joinUserRoom = () => {
-      socket.emit('user:join', { userId });
-    };
+    socket.on('connect', () => {
+      console.log('[GlobalSocketNotifications] ✅ Connected to:', realtimeSocketUrl);
+    });
 
-    const handleDomainEvent = (payload: DomainEventPayload) => {
+    socket.on('connect_error', (error) => {
+      console.error('[GlobalSocketNotifications] ❌ Connection Error to', realtimeSocketUrl, ':', error.message);
+    });
+
+    const handleNewNotification = (payload: NotificationPayload) => {
       if (__DEV__) {
-        console.log('[GlobalSocketNotifications] Event:', payload);
+        console.log('[GlobalSocketNotifications] notification:new', payload);
       }
 
+      // Push directly into global store - updates badge counter instantly
+      addNotification({
+        id: payload.id,
+        recipientUserId: payload.recipientUserId,
+        type: payload.type,
+        message: payload.message,
+        groupId: payload.groupId,
+        read: false,
+        createdAt: payload.createdAt,
+      });
+
+      // 2. Show native alert based on type
       if (payload.type === 'TRANSFERENCIA_ADMIN') {
-        // La data usualmente incluye { toUserId: string, ... }
-        // Verificamos si somos nosotros a quienes transfieren
-        if (payload.data?.toUserId === userId) {
-          Alert.alert(
-            'Transferencia de Administración',
-            'Se te ha solicitado asumir la administración de un grupo de estudio.',
-            [
-              {
-                text: 'Rechazar',
-                style: 'cancel',
-                onPress: async () => {
-                  try {
-                    await groupsHttpService.respondAdminTransfer(payload.groupId, false, token);
-                  } catch (e) {
-                    console.error('Error rejecting admin transfer', e);
-                  }
-                }
-              },
-              {
-                text: 'Aceptar',
-                onPress: async () => {
-                  try {
-                    const result = await groupsHttpService.respondAdminTransfer(payload.groupId, true, token);
-                    if (result.success) {
-                      Alert.alert('Éxito', 'Ahora eres el administrador del grupo.');
-                      router.navigate('/study-groups');
-                    } else {
-                      Alert.alert('Error', result.error || 'No se pudo aceptar la transferencia.');
-                    }
-                  } catch (e) {
-                    console.error('Error accepting admin transfer', e);
-                  }
-                }
-              }
-            ]
-          );
-        } else if (payload.actorUserId === userId && payload.data?.status === 'accepted') {
-          Alert.alert('Transferencia de Administración', 'El usuario aceptó tu solicitud. Ya no eres administrador del grupo.');
-          router.navigate('/study-groups');
-        } else if (payload.actorUserId === userId && payload.data?.status === 'rejected') {
-          Alert.alert('Transferencia de Administración', 'El usuario rechazó tu solicitud para transferirle la administración.');
-        }
+        Alert.alert(
+          'Transferencia de Administración',
+          payload.message,
+          [
+            { text: 'Cerrar', style: 'cancel' },
+            {
+              text: 'Ver grupos',
+              onPress: () => router.navigate('/study-groups'),
+            },
+          ]
+        );
       } else if (payload.type === 'SOLICITUD_INGRESO') {
-        Alert.alert('Nueva Solicitud', '¡Tienes una nueva solicitud de ingreso en tu grupo!');
+        Alert.alert('Nueva Solicitud', payload.message);
       } else if (payload.type === 'MIEMBRO_ACEPTADO') {
-        Alert.alert('Solicitud Aceptada', '¡Tu solicitud de ingreso fue aceptada!');
+        Alert.alert('Solicitud Aceptada', payload.message);
       } else if (payload.type === 'MIEMBRO_RECHAZADO') {
-        Alert.alert('Solicitud Rechazada', 'Tu solicitud de ingreso ha sido rechazada.');
+        Alert.alert('Solicitud Rechazada', payload.message);
       }
+      // SISTEMA / NUEVO_EVENTO: solo actualiza campana, sin alert
     };
 
-    socket.on('connect', joinUserRoom);
-    socket.on('study-group:domain-event', handleDomainEvent);
-
-    if (socket.connected) {
-      joinUserRoom();
-    }
+    socket.on('notification:new', handleNewNotification);
 
     return () => {
-      socket.off('connect', joinUserRoom);
-      socket.off('study-group:domain-event', handleDomainEvent);
+      socket.off('notification:new', handleNewNotification);
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [userId, token, router]);
+  }, [userId, token, router, addNotification]);
 
   return null;
 }

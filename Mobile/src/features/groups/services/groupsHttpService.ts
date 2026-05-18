@@ -221,6 +221,7 @@ const normalizeGroup = (raw: unknown): StudyGroup => {
     is_admin: toBooleanSafe(rawGroup.is_admin ?? rawGroup.isAdmin),
     members,
     pendingRequests,
+    pendingAdminTransfer: rawGroup.pendingAdminTransfer as StudyGroup['pendingAdminTransfer'],
   };
 };
 
@@ -528,5 +529,106 @@ export const groupsHttpService = {
       success: true,
       data: normalizedGroup,
     };
+  },
+
+  /**
+   * Aceptar solicitud de ingreso al grupo
+   * POST /api/study-groups/:groupId/requests/:userId/accept
+   */
+  async acceptRequest(groupId: string, userId: string, token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/requests/${userId}/accept`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
+  },
+
+  /**
+   * Rechazar solicitud de ingreso al grupo
+   * POST /api/study-groups/:groupId/requests/:userId/reject
+   */
+  async rejectRequest(groupId: string, userId: string, token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/requests/${userId}/reject`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
+  },
+
+  /**
+   * Transferir administración y abandonar grupo
+   * POST /api/study-groups/:groupId/transfer-admin
+   */
+  async transferAdminAndLeave(groupId: string, newAdminUserId: string, token: string): Promise<ApiResponse<{ success: boolean }>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/transfer-admin`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newAdminUserId }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: { success: true } };
+  },
+
+  /**
+   * Responder a transferencia de administración
+   * POST /api/study-groups/:groupId/transfer-admin/respond
+   */
+  async respondTransferAdmin(groupId: string, action: 'accept' | 'reject', token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/transfer-admin/respond`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
   },
 };

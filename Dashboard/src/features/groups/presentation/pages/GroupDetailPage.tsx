@@ -401,7 +401,6 @@ export function GroupDetailPage() {
           <p className="text-sm text-ink-500">Materia: {group.subject?.name ?? 'Sin materia'}</p>
           <p className="text-sm text-ink-500">Miembros: {membersCount}</p>
           <p className="text-sm text-ink-500">Solicitudes pendientes: {pendingRequests.length}</p>
-          <p className="text-sm text-ink-500">Administrador: {group.is_admin ? 'Si' : 'No'}</p>
 
           {isTransferPending && pendingTransferCandidate ? (
             <div className="rounded-xl p-3" style={{ background: '#d3e3ff', border: '1px solid #aac8f6' }}>

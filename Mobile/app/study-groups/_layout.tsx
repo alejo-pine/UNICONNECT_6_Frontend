@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import React from 'react';
 import { Pressable } from 'react-native';
+import { NotificationBell } from '@/src/components/NotificationBell';
 
 export default function StudyGroupsLayout() {
   return (
@@ -16,6 +17,7 @@ export default function StudyGroupsLayout() {
         headerTintColor: '#FFFFFF',
         headerTitleStyle: { fontWeight: '600', fontSize: 17 },
         contentStyle: { backgroundColor: '#F8F9FA' },
+        headerRight: () => <NotificationBell />,
       }}
     >
       <Stack.Screen

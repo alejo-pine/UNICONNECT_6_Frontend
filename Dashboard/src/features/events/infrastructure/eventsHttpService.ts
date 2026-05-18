@@ -55,10 +55,15 @@ export const eventsHttpService = {
 
       const rawData =
         payload && typeof payload === 'object' && 'data' in payload
-          ? (payload as { data?: EventCardSummary[] }).data
-          : (payload as EventCardSummary[]);
+          ? (payload as { data?: any[] }).data
+          : (payload as any[]);
 
-      const events = Array.isArray(rawData) ? rawData : [];
+      const events: EventCardSummary[] = (Array.isArray(rawData) ? rawData : []).map((row) => ({
+        ...row,
+        event_date: row.event_date || row.eventDate,
+        event_time: row.event_time || row.eventTime,
+        image_url: row.image_url || row.imageUrl,
+      }));
       return { success: true, data: sortChronological(events) };
     } catch {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
@@ -73,15 +78,91 @@ export const eventsHttpService = {
       const payload = await readJson(response);
       if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
 
-      const event =
+      const rawEvent =
         payload && typeof payload === 'object' && 'data' in payload
-          ? (payload as { data?: EventDetail }).data
-          : (payload as EventDetail);
+          ? (payload as { data?: any }).data
+          : payload;
 
-      if (!event) return { success: false, error: 'No se encontró información del evento.' };
+      if (!rawEvent) return { success: false, error: 'No se encontró información del evento.' };
+      
+      const event: EventDetail = {
+        ...rawEvent,
+        event_date: rawEvent.event_date || rawEvent.eventDate,
+        event_time: rawEvent.event_time || rawEvent.eventTime,
+        image_url: rawEvent.image_url || rawEvent.imageUrl,
+        profile_id: rawEvent.profile_id || rawEvent.profileId,
+        organizer_name: rawEvent.organizer_name || rawEvent.organizerName,
+        created_at: rawEvent.created_at || rawEvent.createdAt,
+      };
+
       return { success: true, data: event };
     } catch {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
+    }
+  },
+  async createEvent(payload: { title: string; category: string; description?: string; imageUrl?: string; eventDate: string; eventTime: string; location?: string; faculty?: string }, token: string): Promise<ApiResponse<{ id: string; title: string; category: string }>> {
+    try {
+      const response = await fetch(EVENTS_ENDPOINT, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(payload),
+      });
+      const data = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(data, response.status) };
+      const result =
+        data && typeof data === 'object' && 'data' in data
+          ? (data as { data?: { id: string; title: string; category: string } }).data
+          : undefined;
+      return { success: true, data: result };
+    } catch {
+      return { success: false, error: 'Error de conexión al crear el evento.' };
+    }
+  },
+
+  async getSubscriptions(token: string): Promise<ApiResponse<string[]>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/suscripciones`, {
+        headers: authHeaders(token),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
+      const data =
+        payload && typeof payload === 'object' && 'data' in payload
+          ? (payload as { data?: string[] }).data
+          : [];
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch {
+      return { success: false, error: 'Error de conexión al obtener suscripciones.' };
+    }
+  },
+
+  async subscribeCategory(category: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/suscribir`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ category }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión al suscribirse.' };
+    }
+  },
+
+  async unsubscribeCategory(category: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/suscribir`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+        body: JSON.stringify({ category }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión al desuscribirse.' };
     }
   },
 };

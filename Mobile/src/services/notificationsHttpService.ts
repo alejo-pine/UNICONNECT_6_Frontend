@@ -2,12 +2,12 @@ import { API_BASE_URL } from '../config/api';
 
 export interface AppNotification {
   id: string;
-  user_id: string;
+  recipientUserId: string;
   type: string;
   message: string;
-  group_id?: string;
+  groupId?: string;
   read: boolean;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface ApiResponse<T = void> {
@@ -19,12 +19,12 @@ export interface ApiResponse<T = void> {
 const NOTIFICATIONS_ENDPOINT = `${API_BASE_URL}/notifications`;
 
 export const notificationsHttpService = {
-  async getNotifications(token: string): Promise<ApiResponse<AppNotification[]>> {
+  async getNotifications(token: string, userId: string): Promise<ApiResponse<AppNotification[]>> {
     try {
       if (__DEV__) {
-        console.log('[notificationsHttpService] GET', NOTIFICATIONS_ENDPOINT);
+        console.log('[notificationsHttpService] GET', `${NOTIFICATIONS_ENDPOINT}?userId=${userId}`);
       }
-      const response = await fetch(NOTIFICATIONS_ENDPOINT, {
+      const response = await fetch(`${NOTIFICATIONS_ENDPOINT}?userId=${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ export const notificationsHttpService = {
 
       const sorted = [...notifications].sort((a, b) => {
         if (a.read === b.read) {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
         return a.read ? 1 : -1;
       });
