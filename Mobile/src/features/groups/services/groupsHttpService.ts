@@ -631,4 +631,97 @@ export const groupsHttpService = {
     }
     return { success: true, data: normalizeGroup(groupPayload) };
   },
+
+  /**
+   * Obtener sesiones de estudio de un grupo
+   * GET /api/study-groups/:groupId/sessions
+   */
+  async getStudySessions(groupId: string, token: string): Promise<ApiResponse<any[]>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    
+    let sessionsPayload: any[] = [];
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (Array.isArray(payload.data)) {
+        sessionsPayload = payload.data;
+      } else if (Array.isArray(result.json)) {
+        sessionsPayload = result.json;
+      }
+    }
+    
+    return { success: true, data: sessionsPayload };
+  },
+
+  /**
+   * Crear sesión(es) de estudio
+   * POST /api/study-groups/:groupId/sessions
+   */
+  async createSession(
+    groupId: string,
+    payload: {
+      name: string;
+      description?: string;
+      location?: string;
+      startTime: string;
+      endTime: string;
+      recurrenceType: string;
+      recurrenceEndDate?: string;
+    },
+    token: string
+  ): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  /**
+   * Actualizar una sesión de estudio
+   * PUT /api/study-groups/sessions/:sessionId
+   */
+  async updateSession(
+    sessionId: string,
+    payload: { name?: string; description?: string; location?: string; updateMode: 'this' | 'future'; fromDate?: string },
+    token: string
+  ): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/sessions/${sessionId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
 };
+

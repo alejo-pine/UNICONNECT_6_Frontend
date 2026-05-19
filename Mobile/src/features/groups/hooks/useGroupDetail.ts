@@ -41,11 +41,13 @@ interface UseGroupDetailReturn {
   respondTransferAdmin: (action: 'accept' | 'reject') => Promise<{ success: boolean; error?: string }>;
   acceptRequest: (userId: string) => Promise<{ success: boolean; error?: string }>;
   rejectRequest: (userId: string) => Promise<{ success: boolean; error?: string }>;
+  sessions: any[];
 }
 
 export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
   const { token } = useAuthStore();
   const [group, setGroup] = useState<StudyGroup | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
@@ -115,8 +117,14 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     const subjectNameCache = subjectNameCacheRef.current;
 
     try {
-      const response = await groupsHttpService.getGroup(groupId, token);
+      const [response, sessionsResponse] = await Promise.all([
+        groupsHttpService.getGroup(groupId, token),
+        groupsHttpService.getStudySessions(groupId, token)
+      ]);
       const groupData = response.data;
+      if (sessionsResponse.success && isMountedRef.current) {
+        setSessions(sessionsResponse.data || []);
+      }
 
       if (response.success && groupData) {
         let enrichedGroup = groupData;
@@ -451,5 +459,17 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     }
   }, [groupId, reload, token]);
 
-  return { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest };
+  return {
+    group,
+    loading,
+    error,
+    reload,
+    joinGroup,
+    leaveGroup,
+    transferAdminAndLeave,
+    respondTransferAdmin,
+    acceptRequest,
+    rejectRequest,
+    sessions,
+  };
 };

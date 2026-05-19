@@ -9,6 +9,7 @@ import { useToast } from '@shared/components/ui/ToastProvider';
 import type { StudyGroup, UserProfileSummary } from '../../domain/groups';
 import { groupsHttpService } from '../../infrastructure/groupsHttpService';
 import { GroupUserRow } from '../components/GroupUserRow';
+import { StudySessionsSection } from '../components/StudySessionsSection';
 
 interface StudyGroupRealtimePayload {
   groupId: string;
@@ -427,6 +428,8 @@ export function GroupDetailPage() {
           {leaveError ? <p className="mt-2 text-sm font-medium text-red-600">{leaveError}</p> : null}
         </div>
       </Card>
+
+      <StudySessionsSection groupId={groupId} isAdmin={isGroupAdmin} />
 
       <Card className="space-y-4">
         <div>
