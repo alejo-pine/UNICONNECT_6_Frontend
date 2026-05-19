@@ -19,6 +19,7 @@ import { groupsColors } from '../constants/colors';
 import { useGroupDetail } from '../hooks/useGroupDetail';
 import type { GroupUser } from '../types/groups';
 import { useAuthStore } from '@/src/store/authStore';
+import { StudySessionsCalendar } from '../components/StudySessionsCalendar';
 
 const colors = groupsColors;
 
@@ -107,10 +108,10 @@ export function GroupManagementScreen() {
   const paramDescription = params.description ? decodeURIComponent(params.description) : '';
 
   const { userId } = useAuthStore();
-  const { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest } = useGroupDetail(groupId);
+  const { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest, sessions } = useGroupDetail(groupId);
 
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'files'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'files' | 'sessions'>('members');
 
   const displayName = group?.name ?? paramName ?? 'Grupo';
   const displaySubject = group?.subject?.name ?? paramSubject ?? '';
@@ -393,6 +394,13 @@ export function GroupManagementScreen() {
             )}
 
             <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'sessions' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('sessions')}
+            >
+              <Text style={[styles.tabText, activeTab === 'sessions' && styles.tabTextActive]}>Sesiones</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.tabButton, activeTab === 'files' && styles.tabButtonActive]}
               onPress={() => setActiveTab('files')}
             >
@@ -435,6 +443,19 @@ export function GroupManagementScreen() {
                 />
               ))
             )}
+          </View>
+        )}
+
+        {activeTab === 'sessions' && (isMember || isAdmin) && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={styles.sectionTitle}>Sesiones de Estudio</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <MaterialIcons name="calendar-today" size={16} color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.label }}>Toca un día con sesión</Text>
+              </View>
+            </View>
+            <StudySessionsCalendar sessions={sessions} isAdmin={isAdmin} groupId={group?.id ?? ''} onRefresh={reload} />
           </View>
         )}
 

@@ -551,4 +551,50 @@ export const groupsHttpService = {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
     }
   },
+
+  async createSession(groupId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/${groupId}/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  },
+
+  async updateSession(sessionId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  },
 };

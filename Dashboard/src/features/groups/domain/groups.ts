@@ -71,3 +71,37 @@ export interface TransferAdminResponse {
   success: boolean;
   message?: string;
 }
+
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly';
+
+export interface StudySession {
+  id: string;
+  groupId: string;
+  creatorId: string;
+  name: string;
+  description: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  seriesId: string | null;
+  recurrenceType: RecurrenceType;
+  createdAt: string;
+}
+
+export interface CreateStudySessionPayload {
+  name: string;
+  description: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  recurrenceType: RecurrenceType;
+  recurrenceEndDate?: string;
+}
+
+export interface UpdateStudySessionPayload {
+  name?: string;
+  description?: string;
+  location?: string;
+  updateMode: 'this' | 'future';
+  fromDate?: string;
+}
