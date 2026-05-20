@@ -20,6 +20,7 @@ import { useGroupDetail } from '../hooks/useGroupDetail';
 import type { GroupUser } from '../types/groups';
 import { useAuthStore } from '@/src/store/authStore';
 import { StudySessionsCalendar } from '../components/StudySessionsCalendar';
+import { GroupLibrarySection } from '../components/GroupLibrarySection';
 
 const colors = groupsColors;
 
@@ -107,11 +108,11 @@ export function GroupManagementScreen() {
   const paramSubject = params.subjectName ? decodeURIComponent(params.subjectName) : '';
   const paramDescription = params.description ? decodeURIComponent(params.description) : '';
 
-  const { userId } = useAuthStore();
+  const { userId, token } = useAuthStore();
   const { group, loading, error, reload, joinGroup, leaveGroup, transferAdminAndLeave, respondTransferAdmin, acceptRequest, rejectRequest, sessions } = useGroupDetail(groupId);
 
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'files' | 'sessions'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'library' | 'sessions'>('members');
 
   const displayName = group?.name ?? paramName ?? 'Grupo';
   const displaySubject = group?.subject?.name ?? paramSubject ?? '';
@@ -401,10 +402,10 @@ export function GroupManagementScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.tabButton, activeTab === 'files' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('files')}
+              style={[styles.tabButton, activeTab === 'library' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('library')}
             >
-              <Text style={[styles.tabText, activeTab === 'files' && styles.tabTextActive]}>Archivos</Text>
+              <Text style={[styles.tabText, activeTab === 'library' && styles.tabTextActive]}>Biblioteca</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -459,11 +460,13 @@ export function GroupManagementScreen() {
           </View>
         )}
 
-        {activeTab === 'files' && (isMember || isAdmin) && (
-          <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 40, alignItems: 'center' }]}>
-            <MaterialIcons name="folder-open" size={48} color={colors.border} />
-            <Text style={[styles.emptyText, { marginTop: 12 }]}>Los archivos del grupo estarán disponibles pronto.</Text>
-          </View>
+        {activeTab === 'library' && (isMember || isAdmin) && (
+          <GroupLibrarySection 
+            groupId={group?.id ?? ''} 
+            isAdmin={isAdmin} 
+            token={token ?? ''} 
+            userId={userId ?? ''}
+          />
         )}
       </ScrollView>
     );

@@ -723,5 +723,77 @@ export const groupsHttpService = {
     }
     return { success: true, data: result.json };
   },
+
+  async getOpenGraphPreview(url: string, token: string): Promise<ApiResponse<any>> {
+    const fetchUrl = `${GROUPS_ENDPOINT}/open-graph?url=${encodeURIComponent(url)}`;
+    const result = await executeFetch(() =>
+      fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    const payload = result.json as Record<string, any>;
+    return { success: true, data: payload.data || payload };
+  },
+
+  async createResource(groupId: string, payload: any, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async getGroupResources(groupId: string, token: string): Promise<ApiResponse<any[]>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    const payload = result.json as Record<string, any>;
+    return { success: true, data: payload.data || [] };
+  },
+
+  async editGroupResource(groupId: string, resourceId: string, payload: any, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources/${resourceId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
 };
 
