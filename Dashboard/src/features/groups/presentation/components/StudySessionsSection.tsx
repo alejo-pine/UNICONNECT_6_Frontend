@@ -97,8 +97,8 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
-  const fetchSessions = useCallback(async () => {
-    setLoading(true);
+  const fetchSessions = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const base = import.meta.env.VITE_BACKEND_PUBLIC_URL || 'http://localhost:3000';
       const res = await fetch(`${base}/study-groups/${groupId}/sessions`, {
@@ -107,10 +107,16 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
       const json = await res.json();
       if (res.ok && Array.isArray(json.data)) setSessions(json.data);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, [groupId, token]);
 
-  useEffect(() => { fetchSessions(); }, [fetchSessions]);
+  useEffect(() => { 
+    fetchSessions();
+    const interval = setInterval(() => {
+      fetchSessions(true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [fetchSessions]);
 
   // ── Calendar ────────────────────────────────────────────────────────────────
   const sessionsByDay: Record<string, StudySession[]> = {};
@@ -129,7 +135,7 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
   });
 
   const todayKey = toDateKey(today);
-  const selectedSessions = selectedKey ? (sessionsByDay[selectedKey] ?? []) : [];
+  const selectedSessions = selectedKey ? (sessionsByDay[selectedKey] ?? []).slice().sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()) : [];
 
   const prevMonth = () => calMonth === 0 ? (setCalMonth(11), setCalYear(y=>y-1)) : setCalMonth(m=>m-1);
   const nextMonth = () => calMonth === 11 ? (setCalMonth(0), setCalYear(y=>y+1)) : setCalMonth(m=>m+1);
@@ -201,6 +207,57 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
     } else {
       toast.push(res.error || 'Error al actualizar', 'error');
     }
+  };
+
+  const handleCancelSession = async (sessionId: string) => {
+    if (!window.confirm('¿Seguro que deseas cancelar esta sesión? Si es parte de una serie, solo se eliminará esta instancia.')) return;
+    
+    try {
+      const base = import.meta.env.VITE_BACKEND_PUBLIC_URL || 'http://localhost:3000';
+      const res = await fetch(`${base}/study-groups/${groupId}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (res.ok) {
+        toast.push('Sesión cancelada', 'success');
+        fetchSessions();
+      } else {
+        const err = await res.json();
+        toast.push(err.error || 'Error al cancelar', 'error');
+      }
+    } catch (e) {
+      toast.push('Error de red al cancelar', 'error');
+    }
+  };
+
+  const updateAttendance = async (sessionId: string, status: 'attending' | 'declined') => {
+    try {
+      const base = import.meta.env.VITE_BACKEND_PUBLIC_URL || 'http://localhost:3000';
+      const res = await fetch(`${base}/study-groups/${groupId}/sessions/${sessionId}/attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        toast.push(status === 'attending' ? 'Asistencia confirmada' : 'Asistencia declinada', 'success');
+        fetchSessions();
+      } else {
+        const err = await res.json();
+        toast.push(err.error || 'Error al actualizar asistencia', 'error');
+      }
+    } catch (e) {
+      toast.push('Error de red', 'error');
+    }
+  };
+
+  const getMyAttendance = (session: StudySession) => {
+    if (!session.attendances) return 'pending';
+    const profileId = useAuthStore.getState().user?.id;
+    const att = session.attendances.find(a => a.userId === profileId);
+    return att ? att.status : 'pending';
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -291,12 +348,51 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
                   </span>
                 )}
               </div>
-              {isAdmin && (
-                <button onClick={() => openEdit(s)}
-                  className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-80"
-                  style={{ background: '#001c39', color: '#fff' }}>
-                  Editar
-                </button>
+              {(isAdmin || s.creatorId === useAuthStore.getState().user?.id) && (
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <button onClick={() => openEdit(s)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-80 transition"
+                    style={{ background: '#001c39', color: '#fff' }}>
+                    Editar
+                  </button>
+                  <button onClick={() => handleCancelSession(s.id)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-80 transition"
+                    style={{ background: '#dc3545', color: '#fff' }}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
+              {!(isAdmin || s.creatorId === useAuthStore.getState().user?.id) ? (
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <p className="text-xs font-medium text-center" style={{ color: '#73777f' }}>Asistencia:</p>
+                  <button onClick={() => updateAttendance(s.id, 'attending')}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-80 transition"
+                    style={{ 
+                      background: getMyAttendance(s) === 'attending' ? '#e2fadb' : '#f8f9fa', 
+                      color: getMyAttendance(s) === 'attending' ? '#2b8a3e' : '#495057',
+                      border: '1px solid',
+                      borderColor: getMyAttendance(s) === 'attending' ? '#2b8a3e' : '#ced4da'
+                    }}>
+                    Asistiré
+                  </button>
+                  <button onClick={() => updateAttendance(s.id, 'declined')}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-80 transition"
+                    style={{ 
+                      background: getMyAttendance(s) === 'declined' ? '#ffe3e3' : '#f8f9fa', 
+                      color: getMyAttendance(s) === 'declined' ? '#e03131' : '#495057',
+                      border: '1px solid',
+                      borderColor: getMyAttendance(s) === 'declined' ? '#e03131' : '#ced4da'
+                    }}>
+                    Declinar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 flex-shrink-0 items-center justify-center bg-gray-50 rounded-lg p-2 border border-gray-100">
+                  <span className="text-lg">👥</span>
+                  <p className="text-xs font-bold text-center" style={{ color: '#00132a' }}>
+                    {s.attendances?.filter(a => a.status === 'attending').length || 0} confirmados
+                  </p>
+                </div>
               )}
             </div>
           ))}

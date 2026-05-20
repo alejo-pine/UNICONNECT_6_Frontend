@@ -795,5 +795,40 @@ export const groupsHttpService = {
     }
     return { success: true, data: result.json };
   },
+
+  async deleteSession(groupId: string, sessionId: string, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions/${sessionId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async updateSessionAttendance(groupId: string, sessionId: string, status: 'attending' | 'declined' | 'pending', token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions/${sessionId}/attendance`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
 };
 
