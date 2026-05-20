@@ -19,6 +19,12 @@ export function getApiBaseUrl(): string {
 }
 
 export function getChatBaseUrl(): string {
+  // In dev, always route through the Vite proxy regardless of VITE_CHAT_SERVICE_URL.
+  // The proxy target is configured in vite.config.ts and reads that env var itself.
+  // This prevents CORS preflight failures for PATCH/DELETE from the browser.
+  if (import.meta.env.DEV) {
+    return `/chat-proxy${DEFAULT_API_PATH}`;
+  }
   const envUrl = import.meta.env.VITE_CHAT_SERVICE_URL;
   if (envUrl && envUrl.trim().length > 0) {
     return normalizeUrl(envUrl) + DEFAULT_API_PATH;

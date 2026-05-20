@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { WallPost, WallPostAttachment } from "../types/wall.types";
+import { WallPollBubble } from "./WallPollBubble";
 
 function getFileIconConfig(mimeType: string): {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -41,9 +42,17 @@ interface Props {
   post: WallPost;
   isOwnPost: boolean;
   onAttachmentPress: (attachment: WallPostAttachment) => void;
+  onPollVote?: (pollId: string, optionId: string) => void;
+  onPollClose?: (pollId: string) => void;
 }
 
-export const WallPostBubble: React.FC<Props> = ({ post, isOwnPost, onAttachmentPress }) => {
+export const WallPostBubble: React.FC<Props> = ({
+  post,
+  isOwnPost,
+  onAttachmentPress,
+  onPollVote,
+  onPollClose,
+}) => {
   const senderLabel = displaySenderName(post);
   const time = new Date(post.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
@@ -65,7 +74,8 @@ export const WallPostBubble: React.FC<Props> = ({ post, isOwnPost, onAttachmentP
           {senderLabel}
         </Text>
 
-        {post.content ? (
+        {/* No mostrar content en posts de encuesta (el backend lo llena con la pregunta) */}
+        {post.content && !post.poll ? (
           <Text style={isOwnPost ? styles.ownText : styles.partnerText}>
             {post.content}
           </Text>
@@ -107,6 +117,15 @@ export const WallPostBubble: React.FC<Props> = ({ post, isOwnPost, onAttachmentP
               );
             })}
           </View>
+        )}
+
+        {post.poll && onPollVote && (
+          <WallPollBubble
+            poll={post.poll}
+            isOwnPost={isOwnPost}
+            onVote={onPollVote}
+            onClose={onPollClose}
+          />
         )}
 
         <Text

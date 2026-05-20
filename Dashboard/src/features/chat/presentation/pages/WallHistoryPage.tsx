@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@shared/store/authStore';
 import { Card } from '@shared/components/ui/Card';
 import { wallSocket } from '../../infrastructure/wallSocketService';
-import { normalizeWallPost } from '../../infrastructure/wallHttpService';
+import { normalizeWallPost, normalizePoll, wallHttpService } from '../../infrastructure/wallHttpService';
 import { dmHttpService } from '../../infrastructure/dmHttpService';
 import { WallPostWithAttachments } from '../components/WallPostWithAttachments';
 import { WallPostInput } from '../components/WallPostInput';
@@ -25,29 +25,83 @@ export function WallHistoryPage() {
 
   const [selectedSender, setSelectedSender] = useState<ChatPartner | null>(null);
   const [dmLoading, setDmLoading] = useState(false);
+  const [pollVoteError, setPollVoteError] = useState(false);
+  const pollVoteErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
   const isLoadingMoreRef = useRef(false);
 
-  // Socket lifecycle
+  // ── Socket lifecycle (wall posts + poll events) ─────────────────────────
   useEffect(() => {
     if (!groupId || !userId) return;
 
     wallSocket.connect(userId);
     wallSocket.joinWall(groupId);
+
+    // Posts de texto/adjuntos normales
     wallSocket.onNewPost((post) => {
-      setPosts((prev) => [...prev, normalizeWallPost(post)]);
+      const normalized = normalizeWallPost(post);
+      setPosts((prev) => {
+        if (prev.some((p) => p.id === normalized.id)) return prev;
+        return [...prev, normalized];
+      });
+    });
+
+    // Encuesta creada → insertar post con poll embebido (deduplicado)
+    wallSocket.onPollCreated((post) => {
+      const normalized = normalizeWallPost(post);
+      setPosts((prev) => {
+        if (prev.some((p) => p.id === normalized.id)) return prev;
+        return [...prev, normalized];
+      });
+    });
+
+    // Voto registrado → actualizar conteos/porcentajes pero preservar votedByMe local.
+    // El socket emite userVotedOptionId del votante, no del usuario que visualiza,
+    // por lo que reutilizar ese campo fijaría votedByMe incorrecto en otros clientes.
+    wallSocket.onPollVoteUpdated((rawPoll) => {
+      const poll = normalizePoll(rawPoll);
+      if (!poll) return;
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.poll?.id !== poll.id) return p;
+          const options = poll.options.map((opt) => ({
+            ...opt,
+            votedByMe: p.poll?.options.find((o) => o.id === opt.id)?.votedByMe ?? false,
+          }));
+          return { ...p, poll: { ...poll, options } };
+        }),
+      );
+    });
+
+    // Encuesta cerrada → mismo tratamiento: preservar votedByMe local
+    wallSocket.onPollClosed((rawPoll) => {
+      const poll = normalizePoll(rawPoll);
+      if (!poll) return;
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.poll?.id !== poll.id) return p;
+          const options = poll.options.map((opt) => ({
+            ...opt,
+            votedByMe: p.poll?.options.find((o) => o.id === opt.id)?.votedByMe ?? false,
+          }));
+          return { ...p, poll: { ...poll, options } };
+        }),
+      );
     });
 
     return () => {
       wallSocket.offNewPost();
+      wallSocket.offPollCreated();
+      wallSocket.offPollVoteUpdated();
+      wallSocket.offPollClosed();
       wallSocket.leaveWall(groupId);
       wallSocket.disconnect();
     };
   }, [groupId, userId, setPosts]);
 
-  // Scroll management: bottom on new post, position restore on load more
+  // ── Scroll management ───────────────────────────────────────────────────
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -61,7 +115,6 @@ export function WallHistoryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts]);
 
-  // Infinite scroll: trigger loadMore when user scrolls near the top
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container || loadingMore || !hasMore) return;
@@ -73,6 +126,7 @@ export function WallHistoryPage() {
     }
   }, [loadingMore, hasMore, loadMore]);
 
+  // ── DM handlers ─────────────────────────────────────────────────────────
   const handleSenderClick = (senderId: string, senderName: string, avatarUrl?: string) => {
     setSelectedSender({ id: senderId, name: senderName, avatarUrl });
   };
@@ -89,9 +143,35 @@ export function WallHistoryPage() {
     }
   };
 
+  // ── Poll handlers ───────────────────────────────────────────────────────
+  const handlePollAlreadyVoted = useCallback(() => {
+    if (pollVoteErrorTimerRef.current) clearTimeout(pollVoteErrorTimerRef.current);
+    setPollVoteError(true);
+    pollVoteErrorTimerRef.current = setTimeout(() => setPollVoteError(false), 3000);
+  }, []);
+
+  const handlePollVote = async (postId: string, pollId: string, optionId: string) => {
+    const result = await wallHttpService.votePoll(pollId, optionId);
+    if (result.success && result.data) {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, poll: result.data } : p)),
+      );
+    }
+  };
+
+  const handlePollClose = async (postId: string, pollId: string) => {
+    const result = await wallHttpService.closePoll(pollId);
+    if (result.success && result.data) {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, poll: result.data } : p)),
+      );
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full flex-col gap-4">
-      {/* Header — always visible */}
+      {/* Header */}
       <div className="flex flex-shrink-0 items-center gap-3">
         <button
           type="button"
@@ -127,7 +207,7 @@ export function WallHistoryPage() {
         </div>
       ) : (
         <>
-          {/* Scrollable messages — fills remaining space */}
+          {/* Scrollable messages */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -151,19 +231,36 @@ export function WallHistoryPage() {
                     post={post}
                     currentUserId={userId ?? undefined}
                     onSenderClick={handleSenderClick}
+                    onPollVote={(pollId, optionId) =>
+                      void handlePollVote(post.id, pollId, optionId)
+                    }
+                    onPollClose={
+                      post.senderId === userId
+                        ? (pollId) => void handlePollClose(post.id, pollId)
+                        : undefined
+                    }
+                    onPollAlreadyVoted={handlePollAlreadyVoted}
                   />
                 ))
               )}
             </div>
           </div>
 
-          {/* Input — always pinned at bottom */}
+          {/* Input */}
           <div className="flex-shrink-0">
             {groupId && <WallPostInput groupId={groupId} />}
           </div>
         </>
       )}
 
+      {/* Toast: intento de voto duplicado */}
+      {pollVoteError && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-ink-900 px-4 py-2.5 text-sm text-white shadow-lg">
+          Ya registraste tu voto en esta encuesta.
+        </div>
+      )}
+
+      {/* DM modal */}
       {selectedSender && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
