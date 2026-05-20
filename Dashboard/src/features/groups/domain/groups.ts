@@ -105,3 +105,32 @@ export interface UpdateStudySessionPayload {
   updateMode: 'this' | 'future';
   fromDate?: string;
 }
+
+export interface OpenGraphData {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  url: string;
+}
+
+export interface GroupResource {
+  id: string;
+  group_id: string;
+  uploaded_by: string;
+  url: string;
+  title: string;
+  description: string;
+  image_url: string;
+  role_required: 'member' | 'admin';
+  metadata?: any;
+  created_at: string;
+}
+
+export interface CreateResourcePayload {
+  url: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  roleRequired?: 'member' | 'admin';
+  metadata?: any;
+}

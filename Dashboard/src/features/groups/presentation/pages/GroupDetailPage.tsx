@@ -10,6 +10,7 @@ import type { StudyGroup, UserProfileSummary } from '../../domain/groups';
 import { groupsHttpService } from '../../infrastructure/groupsHttpService';
 import { GroupUserRow } from '../components/GroupUserRow';
 import { StudySessionsSection } from '../components/StudySessionsSection';
+import { GroupLibrarySection } from '../components/GroupLibrarySection';
 
 interface StudyGroupRealtimePayload {
   groupId: string;
@@ -430,6 +431,8 @@ export function GroupDetailPage() {
       </Card>
 
       <StudySessionsSection groupId={groupId} isAdmin={isGroupAdmin} />
+
+      <GroupLibrarySection groupId={groupId} isAdmin={isGroupAdmin} />
 
       <Card className="space-y-4">
         <div>
