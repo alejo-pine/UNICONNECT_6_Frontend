@@ -11,6 +11,24 @@ export interface GroupMember {
   name: string;
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+  voteCount: number;
+  percentage: number;
+  votedByMe: boolean;
+}
+
+export interface Poll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  totalVotes: number;
+  closed: boolean;
+  expiresAt?: string;
+  closedAt?: string;
+}
+
 export interface WallPost {
   id: string;
   groupId: string;
@@ -22,6 +40,7 @@ export interface WallPost {
   attachments: WallAttachment[];
   mentions: string[];
   mentionedNames: string[];
+  poll?: Poll;
 }
 
 export interface WallInboxItem {

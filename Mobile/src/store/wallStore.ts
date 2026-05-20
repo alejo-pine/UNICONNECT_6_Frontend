@@ -2,7 +2,7 @@ import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
 import { create } from "zustand";
 import { wallHttpService } from "../features/wall-chat/services/wallHttpService";
-import type { WallInboxEntry, WallPost, WallPostAttachment } from "../features/wall-chat/types/wall.types";
+import type { Poll, WallInboxEntry, WallPost, WallPostAttachment } from "../features/wall-chat/types/wall.types";
 import { supabase } from "../services/supabase";
 
 interface WallState {
@@ -23,6 +23,14 @@ interface WallState {
     attachments?: WallPostAttachment[],
   ) => Promise<void>;
   receivePost: (post: WallPost) => void;
+  updatePoll: (poll: Poll) => void;
+  mergePoll: (poll: Poll) => void;
+  createPoll: (
+    groupId: string,
+    question: string,
+    options: string[],
+    durationMinutes: number,
+  ) => Promise<void>;
   uploadAndSendPost: (
     groupId: string,
     fileUri: string,
@@ -93,6 +101,40 @@ export const useWallStore = create<WallState>((set, get) => ({
     const isDuplicate = posts.some((p) => p.id === post.id);
     if (!isDuplicate) {
       set({ posts: [post, ...posts] });
+    }
+  },
+
+  updatePoll: (poll) => {
+    const { posts } = get();
+    set({
+      posts: posts.map((p) => (p.poll?.id === poll.id ? { ...p, poll } : p)),
+    });
+  },
+
+  // mergePoll updates vote counts and percentages from a socket event while
+  // preserving the per-user votedByMe flag stored locally. The socket payload's
+  // userVotedOptionId belongs to the voter, not necessarily to this user.
+  mergePoll: (poll) => {
+    const { posts } = get();
+    set({
+      posts: posts.map((p) => {
+        if (p.poll?.id !== poll.id) return p;
+        const options = poll.options.map((opt) => ({
+          ...opt,
+          votedByMe: p.poll!.options.find((o) => o.id === opt.id)?.votedByMe ?? false,
+        }));
+        return { ...p, poll: { ...poll, options } };
+      }),
+    });
+  },
+
+  createPoll: async (groupId, question, options, durationMinutes) => {
+    try {
+      const post = await wallHttpService.createPoll(groupId, question, options, durationMinutes);
+      get().receivePost(post);
+    } catch (e) {
+      console.error("Error creating poll:", e);
+      throw e;
     }
   },
 

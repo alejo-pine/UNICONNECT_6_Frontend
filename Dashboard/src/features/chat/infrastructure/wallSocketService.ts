@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { WallPost } from '../domain/wall';
+import type { Poll, WallPost } from '../domain/wall';
 
 const CHAT_SERVICE_URL =
   (import.meta.env.VITE_CHAT_SERVICE_URL as string | undefined)?.trim().replace(/\/+$/, '') ??
@@ -46,6 +46,30 @@ class WallSocketService {
 
   offNewPost(): void {
     this.socket?.off('wall:new_post');
+  }
+
+  onPollCreated(callback: (post: WallPost) => void): void {
+    this.socket?.on('encuesta:creada', callback);
+  }
+
+  offPollCreated(): void {
+    this.socket?.off('encuesta:creada');
+  }
+
+  onPollVoteUpdated(callback: (poll: Poll) => void): void {
+    this.socket?.on('encuesta:votoRegistrado', callback);
+  }
+
+  offPollVoteUpdated(): void {
+    this.socket?.off('encuesta:votoRegistrado');
+  }
+
+  onPollClosed(callback: (poll: Poll) => void): void {
+    this.socket?.on('encuesta:cerrada', callback);
+  }
+
+  offPollClosed(): void {
+    this.socket?.off('encuesta:cerrada');
   }
 }
 

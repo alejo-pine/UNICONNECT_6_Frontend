@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { getChatServiceUrl } from "../../../config/api";
-import type { WallPost } from "../types/wall.types";
+import type { Poll, WallPost } from "../types/wall.types";
 
 class WallSocketService {
   private socket: Socket | null = null;
@@ -58,6 +58,30 @@ class WallSocketService {
     if (this.socket) {
       this.socket.off("wall:new_post");
     }
+  }
+
+  onPollCreated(callback: (post: WallPost) => void) {
+    this.socket?.on("encuesta:creada", callback);
+  }
+
+  offPollCreated() {
+    this.socket?.off("encuesta:creada");
+  }
+
+  onPollVoteUpdated(callback: (poll: Poll) => void) {
+    this.socket?.on("encuesta:votoRegistrado", callback);
+  }
+
+  offPollVoteUpdated() {
+    this.socket?.off("encuesta:votoRegistrado");
+  }
+
+  onPollClosed(callback: (poll: Poll) => void) {
+    this.socket?.on("encuesta:cerrada", callback);
+  }
+
+  offPollClosed() {
+    this.socket?.off("encuesta:cerrada");
   }
 }
 
