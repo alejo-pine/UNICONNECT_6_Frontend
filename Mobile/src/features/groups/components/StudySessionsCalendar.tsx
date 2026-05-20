@@ -18,8 +18,15 @@ import { CreateSessionModal } from './CreateSessionModal';
 
 const colors = groupsColors;
 
+interface SessionAttendance {
+  userId: string;
+  status: 'attending' | 'declined' | 'pending';
+  updatedAt: string;
+}
+
 interface StudySession {
   id: string;
+  creatorId?: string;
   name: string;
   description?: string;
   location?: string;
@@ -27,6 +34,7 @@ interface StudySession {
   endTime: string;
   recurrenceType?: string;
   seriesId?: string;
+  attendances?: SessionAttendance[];
 }
 
 interface Props {
@@ -59,7 +67,8 @@ const RECURRENCE_LABELS: Record<string, string> = {
 };
 
 export function StudySessionsCalendar({ sessions, isAdmin, groupId, onRefresh }: Props) {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
+  const currentUserId = user?.id;
   const today = new Date();
 
   // Calendar navigation
@@ -171,6 +180,25 @@ export function StudySessionsCalendar({ sessions, isAdmin, groupId, onRefresh }:
     } else {
       Alert.alert('Error', res.error ?? 'No se pudo actualizar');
     }
+  };
+
+  const updateAttendance = async (sessionId: string, status: 'attending' | 'declined') => {
+    if (!token) return;
+    const res = await groupsHttpService.updateSessionAttendance(groupId, sessionId, status, token);
+    if (res.success) {
+      onRefresh?.();
+      setShowDetail(false);
+      Alert.alert('Éxito', status === 'attending' ? 'Asistencia confirmada' : 'Asistencia declinada');
+    } else {
+      Alert.alert('Error', res.error ?? 'Error al actualizar asistencia');
+    }
+  };
+
+  const getMyAttendance = (session: StudySession) => {
+    if (!session.attendances) return 'pending';
+    const profileId = useAuthStore.getState().user?.id;
+    const att = session.attendances.find(a => a.userId === profileId);
+    return att ? att.status : 'pending';
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -328,16 +356,70 @@ export function StudySessionsCalendar({ sessions, isAdmin, groupId, onRefresh }:
                       </Text>
                     </View>
                   )}
+                  
+                  {/* Attendance Controls */}
+                  {(!isAdmin && detailSession.creatorId !== currentUserId) ? (
+                    <View style={[styles.detailMeta, { marginTop: 8 }]}>
+                      <Text style={[styles.detailMetaText, { color: colors.text, fontWeight: 'bold' }]}>Asistencia:</Text>
+                      <TouchableOpacity 
+                        style={[styles.attBtn, getMyAttendance(detailSession) === 'attending' && { backgroundColor: '#e2fadb', borderColor: '#2b8a3e' }]}
+                        onPress={() => updateAttendance(detailSession.id, 'attending')}
+                      >
+                        <Text style={[styles.attBtnText, getMyAttendance(detailSession) === 'attending' && { color: '#2b8a3e' }]}>Asistiré</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.attBtn, getMyAttendance(detailSession) === 'declined' && { backgroundColor: '#ffe3e3', borderColor: '#e03131' }]}
+                        onPress={() => updateAttendance(detailSession.id, 'declined')}
+                      >
+                        <Text style={[styles.attBtnText, getMyAttendance(detailSession) === 'declined' && { color: '#e03131' }]}>Declinar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={[styles.detailMeta, { marginTop: 8 }]}>
+                      <MaterialIcons name="group" size={14} color={colors.primary} />
+                      <Text style={[styles.detailMetaText, { color: colors.text, fontWeight: 'bold' }]}>
+                        {detailSession.attendances?.filter(a => a.status === 'attending').length || 0} confirmados
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
-                {isAdmin && (
-                  <TouchableOpacity
-                    style={[styles.editBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => openEdit(detailSession)}
-                  >
-                    <MaterialIcons name="edit" size={16} color="#fff" />
-                    <Text style={styles.editBtnText}>Editar sesión</Text>
-                  </TouchableOpacity>
+                {(isAdmin || detailSession.creatorId === currentUserId) && (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <TouchableOpacity
+                      style={[styles.editBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => openEdit(detailSession)}
+                    >
+                      <MaterialIcons name="edit" size={16} color="#fff" />
+                      <Text style={styles.editBtnText}>Editar sesión</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.editBtn, { backgroundColor: '#dc3545' }]}
+                      onPress={() => {
+                        Alert.alert(
+                          'Cancelar sesión',
+                          '¿Seguro que deseas cancelar esta sesión? Si es parte de una serie, solo se eliminará esta instancia.',
+                          [
+                            { text: 'No', style: 'cancel' },
+                            { text: 'Sí, cancelar', style: 'destructive', onPress: async () => {
+                              if (!token) return;
+                              const res = await groupsHttpService.deleteSession(groupId, detailSession.id, token);
+                              if (res.success) {
+                                setShowDetail(false);
+                                onRefresh?.();
+                                Alert.alert('Éxito', 'Sesión cancelada');
+                              } else {
+                                Alert.alert('Error', res.error ?? 'No se pudo cancelar');
+                              }
+                            }}
+                          ]
+                        );
+                      }}
+                    >
+                      <MaterialIcons name="delete" size={16} color="#fff" />
+                      <Text style={styles.editBtnText}>Cancelar sesión</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -576,4 +658,7 @@ const styles = StyleSheet.create({
   scopeOption: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1.5, borderRadius: 14, padding: 14 },
   scopeOptionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   scopeOptionDesc: { fontSize: 12, lineHeight: 16 },
+  // Attendance
+  attBtn: { borderWidth: 1, borderColor: '#ced4da', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginLeft: 6 },
+  attBtnText: { fontSize: 12, color: '#495057', fontWeight: '600' },
 });

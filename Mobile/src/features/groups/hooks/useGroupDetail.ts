@@ -34,7 +34,7 @@ interface UseGroupDetailReturn {
   group: StudyGroup | null;
   loading: boolean;
   error: string | null;
-  reload: () => Promise<void>;
+  reload: (silent?: boolean) => Promise<void>;
   joinGroup: () => Promise<{ success: boolean; error?: string }>;
   leaveGroup: () => Promise<{ success: boolean; error?: string }>;
   transferAdminAndLeave: (newAdminUserId: string) => Promise<{ success: boolean; error?: string }>;
@@ -98,18 +98,18 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
     }
   }, []);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (silent = false) => {
     if (!token || !groupId) {
       if (isMountedRef.current) {
         setError('Se requieren credenciales válidas');
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
       return;
     }
 
     if (isMountedRef.current) {
-      setLoading(true);
-      setError(null);
+      if (!silent) setLoading(true);
+      if (!silent) setError(null);
     }
 
     await loadCache();
@@ -237,13 +237,13 @@ export const useGroupDetail = (groupId: string): UseGroupDetailReturn => {
       }
     } catch (err) {
       console.error('[useGroupDetail] Error:', err);
-      if (isMountedRef.current) {
+      if (isMountedRef.current && !silent) {
         setError('Error al cargar el grupo');
         setGroup(null);
       }
     } finally {
       if (isMountedRef.current) {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     }
   }, [groupId, token, loadCache, persistCache]);

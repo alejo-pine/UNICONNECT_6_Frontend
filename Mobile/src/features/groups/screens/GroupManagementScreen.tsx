@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -129,6 +129,14 @@ export function GroupManagementScreen() {
   const hasRequested = pendingRequests.some((m) => m.id === userId) || false;
   const memberCount = group?.member_count ?? group?.members?.length ?? 0;
   const pendingAdminTransfer = group?.pendingAdminTransfer;
+
+  useEffect(() => {
+    // Poll for updates (e.g. attendance changes) every 5 seconds silently
+    const interval = setInterval(() => {
+      reload(true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [reload]);
 
   const handleAcceptRequest = useCallback(async (id: string) => {
     setActionLoading(true);
