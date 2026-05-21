@@ -26,8 +26,6 @@ test.describe('US-22 — Flujo crítico Uniconnect', () => {
     await page.goto(BASE_URL, { waitUntil: 'networkidle' });
 
     const url = page.url();
-    const bodyText = await page.locator('body').innerText().catch(() => '');
-
     // La app puede: mostrar login propio, redirigir a Auth0, o mostrar el dashboard
     const loginPresent =
       url.includes('auth0.com') ||
