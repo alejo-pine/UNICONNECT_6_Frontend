@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2, Bell, BellOff, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2, BellOff, CheckCircle2 } from 'lucide-react';
 import { useEventDetail } from '../hooks/useEventDetail';
 import { useEventSubscription } from '../hooks/useEventSubscription';
 
