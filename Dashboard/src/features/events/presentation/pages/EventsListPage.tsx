@@ -171,7 +171,7 @@ export function EventsListPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
     title: '',
-    category: AVAILABLE_CATEGORIES[0],
+    category: AVAILABLE_CATEGORIES[0] as string,
     description: '',
     imageUrl: '',
     eventDate: new Date().toISOString().split('T')[0],

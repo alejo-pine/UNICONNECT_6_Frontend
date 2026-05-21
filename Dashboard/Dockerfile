@@ -6,8 +6,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Instalar dependencias primero (layer caching)
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 # Copiar todo el código fuente
 COPY . .
