@@ -176,14 +176,30 @@ El proyecto está configurado con **EAS Build** para compilación nativa:
 
 ```bash
 # Build de desarrollo
-npx eas-cli@latest build --profile development --platform android
+npx eas-cli build --profile development --platform android
 
-# Build de preview
-npx eas-cli@latest build --profile preview --platform android
+# Build de preview (Genera un APK instalable)
+npx eas-cli build --profile preview --platform android
 
 # Build de producción
-npx eas-cli@latest build --profile production --platform android
+npx eas-cli build --profile production --platform android
 ```
+
+## Distribución (Evaluadores y Docente)
+
+Para probar la aplicación en un dispositivo Android real sin necesidad de compilar el código o instalar Expo Go, hemos generado un **APK (Preview)** firmado y listo para instalar.
+
+### Descarga del APK
+🔗 **[Descargar UniConnect APK (Preview)](https://expo.dev/accounts/juanfe_004/projects/uniconnect_2/builds/1c65593e-a9f0-46d7-8237-8dbe2284539f)**
+*(Nota: Este enlace corresponde a la última versión construida apuntando al entorno de producción en Fly.io).*
+
+### Instrucciones de Instalación
+1. Descarga el archivo `.apk` desde tu dispositivo Android.
+2. Si es la primera vez que instalas un APK externo, ve a **Configuración > Seguridad > Instalar aplicaciones desconocidas** y permite la instalación desde tu navegador o gestor de archivos.
+3. Abre el archivo descargado y presiona **Instalar**.
+4. ¡Listo! Abre la aplicación, inicia sesión y comienza a interactuar con los grupos y mensajes conectándote a nuestro backend en producción (Fly.io).
+
+*Nota sobre Seguridad:* Durante la construcción (EAS Build), los secretos y credenciales sensibles (`EXPO_PUBLIC_...`) se inyectan dinámicamente en el empaquetado y **no están guardados en el código fuente de forma insegura**, cumpliendo con las políticas de seguridad del repositorio.
 
 ## Equipo
 
