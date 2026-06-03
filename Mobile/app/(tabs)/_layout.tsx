@@ -264,6 +264,24 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
             )}
             inactiveTintColor="#FFFFFF"
           />
+
+          <DrawerItem
+            label="Foros"
+            onPress={() => {
+              props.navigation.closeDrawer();
+              router.navigate("/forum");
+            }}
+            labelStyle={styles.drawerItemLabel}
+            style={styles.drawerItem}
+            icon={({ size, color }) => (
+              <Ionicons
+                name="chatbox-ellipses-outline"
+                size={size}
+                color={color}
+              />
+            )}
+            inactiveTintColor="#FFFFFF"
+          />
         </View>
       </DrawerContentScrollView>
 

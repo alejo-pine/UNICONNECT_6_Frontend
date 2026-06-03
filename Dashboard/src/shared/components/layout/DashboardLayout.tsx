@@ -14,6 +14,7 @@ const navItems = [
   { to: '/groups', label: 'Grupos', icon: 'group' },
   { to: '/events', label: 'Eventos', icon: 'event' },
   { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
+  { to: '/forum', label: 'Foros', icon: 'forum' },
 ];
 
 const getNavLabel = (pathname: string) => {
