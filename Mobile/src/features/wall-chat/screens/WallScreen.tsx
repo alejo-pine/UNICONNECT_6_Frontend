@@ -15,6 +15,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWall } from "../hooks/useWall";
 import { wallHttpService } from "../services/wallHttpService";
 import { useWallStore } from "../../../store/wallStore";
+import {
+  extractModerationError,
+  useModerationFeedback,
+} from "../../chat/hooks/useModerationFeedback";
 import type { WallPostAttachment } from "../types/wall.types";
 import { WallInput } from "../components/WallInput";
 import { WallPostBubble } from "../components/WallPostBubble";
@@ -43,12 +47,15 @@ export const WallScreen: React.FC = () => {
   const { updatePoll } = useWallStore();
 
   const [isSending, setIsSending] = useState(false);
+  const { isBlocked, displayMessage, handleModerationError, clearError } =
+    useModerationFeedback();
 
   const resolvedGroupName = groupName ? decodeURIComponent(groupName) : "Muro del Grupo";
 
   const handleSend = async (content?: string, file?: any) => {
-    if (!groupId) return;
+    if (!groupId || isBlocked) return;
     setIsSending(true);
+    clearError();
     try {
       if (file) {
         await uploadAndSendPost(groupId, file.uri, file.name, file.mimeType, file.size);
@@ -56,7 +63,12 @@ export const WallScreen: React.FC = () => {
         await sendPost(groupId, content);
       }
     } catch (e) {
-      console.error("Failed to send post:", e);
+      const { code, detail } = extractModerationError(e);
+      if (code) {
+        handleModerationError(code, detail);
+      } else {
+        console.error("Failed to send post:", e);
+      }
     } finally {
       setIsSending(false);
     }
@@ -180,6 +192,9 @@ export const WallScreen: React.FC = () => {
           onSend={handleSend}
           onSendPoll={handleSendPoll}
           isSending={isSending}
+          moderationMessage={displayMessage}
+          isBlocked={isBlocked}
+          onTyping={clearError}
         />
       </View>
     </KeyboardAvoidingView>

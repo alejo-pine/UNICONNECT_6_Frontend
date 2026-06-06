@@ -17,6 +17,10 @@ import chatApi from "../../../services/chatApi";
 import { MessageBubble } from "../components/MessageBubble";
 import { MessageInput } from "../components/MessageInput";
 import { useChat } from "../hooks/useChat";
+import {
+  extractModerationError,
+  useModerationFeedback,
+} from "../hooks/useModerationFeedback";
 
 export const ChatScreen: React.FC = () => {
   const router = useRouter();
@@ -38,11 +42,15 @@ export const ChatScreen: React.FC = () => {
     uploadAndSendAttachment,
     userId,
   } = useChat(conversationId);
+
   const [isSending, setIsSending] = useState(false);
+  const { isBlocked, displayMessage, handleModerationError, clearError } =
+    useModerationFeedback();
 
   const handleSend = async (content?: string, file?: any) => {
-    if (!conversationId) return;
+    if (!conversationId || isBlocked) return;
     setIsSending(true);
+    clearError();
     try {
       if (file) {
         await uploadAndSendAttachment(
@@ -56,7 +64,12 @@ export const ChatScreen: React.FC = () => {
         await sendMessage(conversationId, content);
       }
     } catch (e) {
-      console.error("Failed to send:", e);
+      const { code, detail } = extractModerationError(e);
+      if (code) {
+        handleModerationError(code, detail);
+      } else {
+        console.error("Failed to send:", e);
+      }
     } finally {
       setIsSending(false);
     }
@@ -161,7 +174,13 @@ export const ChatScreen: React.FC = () => {
             }
           />
         )}
-        <MessageInput onSend={handleSend} isSending={isSending} />
+        <MessageInput
+          onSend={handleSend}
+          isSending={isSending}
+          moderationMessage={displayMessage}
+          isBlocked={isBlocked}
+          onTyping={clearError}
+        />
       </View>
     </Container>
   );

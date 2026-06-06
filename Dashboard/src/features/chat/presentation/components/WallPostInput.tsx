@@ -6,6 +6,12 @@ import { uploadToSupabase } from '../../infrastructure/attachmentService';
 import { wallHttpService } from '../../infrastructure/wallHttpService';
 import { useGroupMembers } from '../hooks/useGroupMembers';
 import { AttachmentChip } from './AttachmentChip';
+import { ModerationBanner } from './ModerationBanner';
+import { useModerationFeedback } from '../hooks/useModerationFeedback';
+
+const MAX_LENGTH = 1000;
+const COUNTER_THRESHOLD = 750;
+const URL_REGEX = /https?:\/\/[^\s]+|www\.[^\s]+/i;
 
 interface Props {
   groupId: string;
@@ -25,6 +31,10 @@ export function WallPostInput({ groupId }: Props) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [urlWarning, setUrlWarning] = useState(false);
+
+  const { moderationCode, isBlocked, displayMessage, handleModerationError, clearError } =
+    useModerationFeedback();
 
   // Mention state
   const [showMentions, setShowMentions] = useState(false);
@@ -99,6 +109,9 @@ export function WallPostInput({ groupId }: Props) {
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setContent(val);
+    setSendError(null);
+    clearError();
+    setUrlWarning(URL_REGEX.test(val));
     const cursor = e.target.selectionStart ?? val.length;
     detectMentionTrigger(val, cursor);
   };
@@ -162,7 +175,7 @@ export function WallPostInput({ groupId }: Props) {
     const readyAttachments = pendingAttachments.filter(
       (a) => !a.uploading && a.storagePath && !a.error,
     );
-    if ((!trimmed && readyAttachments.length === 0) || sending) return;
+    if ((!trimmed && readyAttachments.length === 0) || sending || isBlocked) return;
 
     setSending(true);
     setSendError(null);
@@ -189,10 +202,16 @@ export function WallPostInput({ groupId }: Props) {
     );
 
     if (!result.success) {
-      setSendError(result.error ?? 'No se pudo enviar el mensaje');
+      if (result.moderationCode) {
+        handleModerationError(result.moderationCode, result.error);
+      } else {
+        setSendError(result.error ?? 'No se pudo enviar el mensaje');
+      }
     } else {
       setContent('');
       setPendingAttachments([]);
+      setUrlWarning(false);
+      clearError();
       mentionedMapRef.current.clear();
     }
 
@@ -259,7 +278,8 @@ export function WallPostInput({ groupId }: Props) {
   const hasReadyContent =
     content.trim().length > 0 ||
     pendingAttachments.some((a) => !a.uploading && a.storagePath && !a.error);
-  const canSend = hasReadyContent && !sending && !isUploading;
+  const canSend = hasReadyContent && !sending && !isUploading && !isBlocked;
+  const showCounter = content.length > COUNTER_THRESHOLD;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -391,14 +411,25 @@ export function WallPostInput({ groupId }: Props) {
             </div>
           )}
 
-          {sendError && <p className="mb-2 text-xs font-medium text-red-600">{sendError}</p>}
+          <ModerationBanner message={displayMessage} isSpam={moderationCode === 'MO_003'} />
+
+          {!displayMessage && sendError && (
+            <p className="mb-2 text-xs font-medium text-red-600">{sendError}</p>
+          )}
+
+          {urlWarning && !displayMessage && (
+            <p className="mb-2 text-xs font-medium text-amber-600">
+              No se permiten enlaces externos en el chat.
+            </p>
+          )}
 
           <div className="flex items-end gap-2">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               title="Adjuntar archivo"
-              className="flex-shrink-0 rounded-lg p-2 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+              disabled={isBlocked}
+              className="flex-shrink-0 rounded-lg p-2 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700 disabled:opacity-40"
             >
               <Paperclip size={18} />
             </button>
@@ -407,7 +438,8 @@ export function WallPostInput({ groupId }: Props) {
               type="button"
               onClick={togglePollMode}
               title="Crear encuesta"
-              className="flex-shrink-0 rounded-lg p-2 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+              disabled={isBlocked}
+              className="flex-shrink-0 rounded-lg p-2 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700 disabled:opacity-40"
             >
               <BarChart2 size={18} />
             </button>
@@ -460,10 +492,22 @@ export function WallPostInput({ groupId }: Props) {
                 value={content}
                 onChange={handleContentChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Escribe un mensaje… usa @ para mencionar"
+                placeholder={isBlocked ? 'Espera antes de escribir de nuevo…' : 'Escribe un mensaje… usa @ para mencionar'}
                 rows={2}
-                className="w-full resize-none rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-sm text-ink-900 placeholder-ink-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                maxLength={MAX_LENGTH}
+                disabled={isBlocked}
+                className="w-full resize-none rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-sm text-ink-900 placeholder-ink-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
               />
+              {showCounter && (
+                <span
+                  className={[
+                    'absolute bottom-2 right-2 text-xs',
+                    content.length >= MAX_LENGTH ? 'text-red-500' : 'text-ink-400',
+                  ].join(' ')}
+                >
+                  {content.length}/{MAX_LENGTH}
+                </span>
+              )}
             </div>
 
             <Button
