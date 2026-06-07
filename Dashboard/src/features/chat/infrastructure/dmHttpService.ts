@@ -90,6 +90,48 @@ const getError = (payload: unknown, status: number): string => {
   return `Error ${status}`;
 };
 
+const SPAM_PATTERN = /demasiados mensajes en poco tiempo/i;
+
+const extractModeration = (
+  payload: unknown,
+  status: number,
+): { error: string; moderationCode?: string; escalated?: boolean; ruleExplanation?: string } => {
+  if (payload && typeof payload === 'object') {
+    const obj = payload as Record<string, unknown>;
+    // Backend now sends 'moderationCode'; fallback to legacy 'codigoError' for compat
+    const code =
+      typeof obj.moderationCode === 'string' ? obj.moderationCode :
+      typeof obj.codigoError === 'string' ? obj.codigoError :
+      undefined;
+    if (code?.startsWith('MO_')) {
+      // ruleExplanation is the detailed rule text shown in "¿Por qué?", kept separate from
+      // the short banner message. Use detalle for legacy compat, else fall to obj.message.
+      const ruleExplanation =
+        typeof obj.ruleExplanation === 'string' && obj.ruleExplanation.trim()
+          ? obj.ruleExplanation : undefined;
+      const escalated = obj.escalated === true;
+      const errorMsg =
+        typeof obj.detalle === 'string' && obj.detalle.trim()
+          ? obj.detalle : getError(payload, status);
+      return { error: errorMsg, moderationCode: code, escalated, ruleExplanation };
+    }
+    // Fallback: detect MO_003 by message text if moderationCode field is absent
+    const msg = typeof obj.message === 'string' ? obj.message : '';
+    if (SPAM_PATTERN.test(msg)) {
+      return { error: msg, moderationCode: 'MO_003' };
+    }
+  }
+  return { error: getError(payload, status) };
+};
+
+const isModerationJson = (payload: unknown): boolean => {
+  if (!payload || typeof payload !== 'object') return false;
+  const obj = payload as Record<string, unknown>;
+  return obj.valido === false &&
+    typeof obj.codigoError === 'string' &&
+    (obj.codigoError as string).startsWith('MO_');
+};
+
 export const dmHttpService = {
   async getConversations(): Promise<ChatApiResponse<DmConversation[]>> {
     try {
@@ -178,7 +220,7 @@ export const dmHttpService = {
       );
       const json = await safeJson(response);
 
-      if (!response.ok) return { success: false, error: getError(json, response.status) };
+      if (!response.ok || isModerationJson(json)) return { success: false, ...extractModeration(json, response.status) };
 
       return { success: true, data: normalizeMessage(json) };
     } catch {
