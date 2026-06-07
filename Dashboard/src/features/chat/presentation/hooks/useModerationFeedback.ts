@@ -26,6 +26,8 @@ export function useModerationFeedback() {
   );
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(() => getRemainingSeconds());
+  const [escalated, setEscalated] = useState(false);
+  const [ruleExplanation, setRuleExplanation] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = () => {
@@ -35,34 +37,67 @@ export function useModerationFeedback() {
     }
   };
 
+  const expireBlock = () => {
+    clearTimer();
+    setModerationCode(null);
+    setServerMessage(null);
+    setEscalated(false);
+    setRuleExplanation(null);
+    setCooldownSeconds(0);
+    try { localStorage.removeItem(SPAM_BLOCK_KEY); } catch { /* noop */ }
+  };
+
+  // Lee el timestamp real en cada tick en vez de decrementar state (prev - 1).
+  // Así el countdown es preciso aunque el browser throttlee el intervalo en
+  // pestañas de fondo (los navegadores limitan setInterval a ~1 vez/min en BG).
   const startInterval = () => {
     clearTimer();
     timerRef.current = setInterval(() => {
-      setCooldownSeconds((prev) => {
-        if (prev <= 1) {
-          clearTimer();
-          setModerationCode(null);
-          setServerMessage(null);
-          try { localStorage.removeItem(SPAM_BLOCK_KEY); } catch { /* noop */ }
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = getRemainingSeconds();
+      if (remaining <= 0) {
+        expireBlock();
+      } else {
+        setCooldownSeconds(remaining);
+      }
     }, 1000);
   };
 
-  // Rehydrata el timer al montar si hay un bloqueo activo en localStorage
   useEffect(() => {
     if (getRemainingSeconds() > 0) {
       startInterval();
     }
-    return () => clearTimer();
+
+    // Corrige el display inmediatamente al volver a la pestaña, sin esperar
+    // al próximo tick del intervalo (que puede haber tardado hasta 1 min).
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const remaining = getRemainingSeconds();
+      if (remaining > 0) {
+        setCooldownSeconds(remaining);
+        if (timerRef.current == null) startInterval();
+      } else if (timerRef.current != null) {
+        expireBlock();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearTimer();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleModerationError = (code: string, detail?: string) => {
+  const handleModerationError = (
+    code: string,
+    detail?: string,
+    esc?: boolean,
+    ruleExp?: string,
+  ) => {
     setModerationCode(code);
     setServerMessage(detail ?? null);
+    setEscalated(esc ?? false);
+    setRuleExplanation(ruleExp ?? null);
 
     if (code === 'MO_003') {
       try {
@@ -77,6 +112,8 @@ export function useModerationFeedback() {
     if (moderationCode !== 'MO_003') {
       setModerationCode(null);
       setServerMessage(null);
+      setEscalated(false);
+      setRuleExplanation(null);
     }
   };
 
@@ -101,6 +138,8 @@ export function useModerationFeedback() {
     isBlocked,
     cooldownSeconds,
     displayMessage,
+    escalated,
+    ruleExplanation,
     handleModerationError,
     clearError,
   };

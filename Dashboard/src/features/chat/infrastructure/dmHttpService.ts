@@ -95,15 +95,27 @@ const SPAM_PATTERN = /demasiados mensajes en poco tiempo/i;
 const extractModeration = (
   payload: unknown,
   status: number,
-): { error: string; moderationCode?: string } => {
+): { error: string; moderationCode?: string; escalated?: boolean; ruleExplanation?: string } => {
   if (payload && typeof payload === 'object') {
     const obj = payload as Record<string, unknown>;
-    const code = typeof obj.codigoError === 'string' ? obj.codigoError : undefined;
+    // Backend now sends 'moderationCode'; fallback to legacy 'codigoError' for compat
+    const code =
+      typeof obj.moderationCode === 'string' ? obj.moderationCode :
+      typeof obj.codigoError === 'string' ? obj.codigoError :
+      undefined;
     if (code?.startsWith('MO_')) {
-      const detail = typeof obj.detalle === 'string' && obj.detalle.trim() ? obj.detalle : undefined;
-      return { error: detail ?? getError(payload, status), moderationCode: code };
+      // ruleExplanation is the detailed rule text shown in "¿Por qué?", kept separate from
+      // the short banner message. Use detalle for legacy compat, else fall to obj.message.
+      const ruleExplanation =
+        typeof obj.ruleExplanation === 'string' && obj.ruleExplanation.trim()
+          ? obj.ruleExplanation : undefined;
+      const escalated = obj.escalated === true;
+      const errorMsg =
+        typeof obj.detalle === 'string' && obj.detalle.trim()
+          ? obj.detalle : getError(payload, status);
+      return { error: errorMsg, moderationCode: code, escalated, ruleExplanation };
     }
-    // MO_003: el backend pierde codigoError al pasar por ValidationError; detectar por mensaje
+    // Fallback: detect MO_003 by message text if moderationCode field is absent
     const msg = typeof obj.message === 'string' ? obj.message : '';
     if (SPAM_PATTERN.test(msg)) {
       return { error: msg, moderationCode: 'MO_003' };

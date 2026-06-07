@@ -44,7 +44,7 @@ export const ChatScreen: React.FC = () => {
   } = useChat(conversationId);
 
   const [isSending, setIsSending] = useState(false);
-  const { isBlocked, displayMessage, handleModerationError, clearError } =
+  const { isBlocked, displayMessage, escalated, ruleExplanation, handleModerationError, clearError } =
     useModerationFeedback();
 
   const handleSend = async (content?: string, file?: any) => {
@@ -64,9 +64,9 @@ export const ChatScreen: React.FC = () => {
         await sendMessage(conversationId, content);
       }
     } catch (e) {
-      const { code, detail } = extractModerationError(e);
+      const { code, detail, escalated: esc, ruleExplanation: ruleExp } = extractModerationError(e);
       if (code) {
-        handleModerationError(code, detail);
+        handleModerationError(code, detail, esc, ruleExp);
       } else {
         console.error("Failed to send:", e);
       }
@@ -180,6 +180,8 @@ export const ChatScreen: React.FC = () => {
           moderationMessage={displayMessage}
           isBlocked={isBlocked}
           onTyping={clearError}
+          ruleExplanation={ruleExplanation}
+          escalated={escalated}
         />
       </View>
     </Container>

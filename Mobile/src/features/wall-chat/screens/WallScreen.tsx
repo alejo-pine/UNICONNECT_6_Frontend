@@ -47,7 +47,7 @@ export const WallScreen: React.FC = () => {
   const { updatePoll } = useWallStore();
 
   const [isSending, setIsSending] = useState(false);
-  const { isBlocked, displayMessage, handleModerationError, clearError } =
+  const { isBlocked, displayMessage, escalated, ruleExplanation, handleModerationError, clearError } =
     useModerationFeedback();
 
   const resolvedGroupName = groupName ? decodeURIComponent(groupName) : "Muro del Grupo";
@@ -63,9 +63,9 @@ export const WallScreen: React.FC = () => {
         await sendPost(groupId, content);
       }
     } catch (e) {
-      const { code, detail } = extractModerationError(e);
+      const { code, detail, escalated: esc, ruleExplanation: ruleExp } = extractModerationError(e);
       if (code) {
-        handleModerationError(code, detail);
+        handleModerationError(code, detail, esc, ruleExp);
       } else {
         console.error("Failed to send post:", e);
       }
@@ -195,6 +195,8 @@ export const WallScreen: React.FC = () => {
           moderationMessage={displayMessage}
           isBlocked={isBlocked}
           onTyping={clearError}
+          ruleExplanation={ruleExplanation}
+          escalated={escalated}
         />
       </View>
     </KeyboardAvoidingView>

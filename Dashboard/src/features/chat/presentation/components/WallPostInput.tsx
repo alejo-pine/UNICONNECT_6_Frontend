@@ -33,7 +33,7 @@ export function WallPostInput({ groupId }: Props) {
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [urlWarning, setUrlWarning] = useState(false);
 
-  const { moderationCode, isBlocked, displayMessage, handleModerationError, clearError } =
+  const { moderationCode, isBlocked, displayMessage, escalated, ruleExplanation, handleModerationError, clearError } =
     useModerationFeedback();
 
   // Mention state
@@ -203,7 +203,7 @@ export function WallPostInput({ groupId }: Props) {
 
     if (!result.success) {
       if (result.moderationCode) {
-        handleModerationError(result.moderationCode, result.error);
+        handleModerationError(result.moderationCode, result.error, result.escalated, result.ruleExplanation);
       } else {
         setSendError(result.error ?? 'No se pudo enviar el mensaje');
       }
@@ -411,7 +411,12 @@ export function WallPostInput({ groupId }: Props) {
             </div>
           )}
 
-          <ModerationBanner message={displayMessage} isSpam={moderationCode === 'MO_003'} />
+          <ModerationBanner
+            message={displayMessage}
+            isSpam={moderationCode === 'MO_003'}
+            ruleExplanation={ruleExplanation}
+            escalated={escalated}
+          />
 
           {!displayMessage && sendError && (
             <p className="mb-2 text-xs font-medium text-red-600">{sendError}</p>

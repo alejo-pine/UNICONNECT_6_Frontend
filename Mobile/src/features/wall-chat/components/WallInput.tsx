@@ -32,6 +32,8 @@ interface Props {
   moderationMessage?: string | null;
   isBlocked?: boolean;
   onTyping?: () => void;
+  ruleExplanation?: string | null;
+  escalated?: boolean;
 }
 
 const DURATION_OPTIONS = [
@@ -50,9 +52,12 @@ export const WallInput: React.FC<Props> = ({
   moderationMessage,
   isBlocked = false,
   onTyping,
+  ruleExplanation,
+  escalated = false,
 }) => {
   const [text, setText] = useState("");
   const [file, setFile] = useState<AttachmentFile | null>(null);
+  const [whyOpen, setWhyOpen] = useState(false);
 
   // Poll modal state
   const [pollModalVisible, setPollModalVisible] = useState(false);
@@ -257,20 +262,52 @@ export const WallInput: React.FC<Props> = ({
               isBlocked ? styles.moderationBannerSpam : styles.moderationBannerError,
             ]}
           >
-            <Ionicons
-              name={isBlocked ? "time-outline" : "alert-circle-outline"}
-              size={14}
-              color={isBlocked ? "#92400E" : "#991B1B"}
-              style={styles.moderationIcon}
-            />
-            <Text
-              style={[
-                styles.moderationText,
-                isBlocked ? styles.moderationTextSpam : styles.moderationTextError,
-              ]}
-            >
-              {moderationMessage}
-            </Text>
+            {/* Main message row */}
+            <View style={styles.moderationRow}>
+              <Ionicons
+                name={isBlocked ? "time-outline" : "alert-circle-outline"}
+                size={14}
+                color={isBlocked ? "#92400E" : "#991B1B"}
+                style={styles.moderationIcon}
+              />
+              <Text
+                style={[
+                  styles.moderationText,
+                  isBlocked ? styles.moderationTextSpam : styles.moderationTextError,
+                ]}
+              >
+                {moderationMessage}
+              </Text>
+              {ruleExplanation ? (
+                <TouchableOpacity onPress={() => setWhyOpen((v) => !v)} style={styles.whyButton}>
+                  <Text style={[styles.whyText, isBlocked ? styles.moderationTextSpam : styles.moderationTextError]}>
+                    ¿Por qué?
+                  </Text>
+                  <Ionicons
+                    name={whyOpen ? "chevron-up" : "chevron-down"}
+                    size={11}
+                    color={isBlocked ? "#92400E" : "#991B1B"}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Rule explanation — collapsible */}
+            {whyOpen && ruleExplanation ? (
+              <Text style={[styles.ruleExplanation, isBlocked ? styles.moderationTextSpam : styles.moderationTextError]}>
+                {ruleExplanation}
+              </Text>
+            ) : null}
+
+            {/* Escalation notice */}
+            {escalated ? (
+              <View style={styles.escalationRow}>
+                <Ionicons name="shield-half-outline" size={12} color="#92400E" style={{ marginTop: 1, marginRight: 4 }} />
+                <Text style={styles.escalationText}>
+                  Tu caso fue escalado a revisión humana. Un administrador lo revisará pronto.
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -338,13 +375,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   moderationBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 8,
     marginHorizontal: 4,
+  },
+  moderationRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   moderationBannerError: {
     backgroundColor: "#FEF2F2",
@@ -372,6 +411,42 @@ const styles = StyleSheet.create({
   },
   moderationTextSpam: {
     color: "#92400E",
+  },
+  whyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 6,
+    flexShrink: 0,
+    gap: 2,
+  },
+  whyText: {
+    fontSize: 11,
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
+  ruleExplanation: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#FDE68A",
+    opacity: 0.9,
+  },
+  escalationRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#FDE68A",
+  },
+  escalationText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#92400E",
+    lineHeight: 16,
   },
   inputWrapperDisabled: {
     opacity: 0.6,

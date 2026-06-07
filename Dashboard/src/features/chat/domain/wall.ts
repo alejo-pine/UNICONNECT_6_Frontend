@@ -62,4 +62,6 @@ export interface ChatApiResponse<T> {
   data?: T;
   error?: string;
   moderationCode?: string;
+  escalated?: boolean;
+  ruleExplanation?: string;
 }

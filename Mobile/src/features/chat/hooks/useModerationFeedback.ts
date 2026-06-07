@@ -24,6 +24,8 @@ const getRemainingSeconds = (): number => {
 export interface ModerationError {
   code?: string;
   detail?: string;
+  escalated?: boolean;
+  ruleExplanation?: string;
 }
 
 const SPAM_PATTERN = /demasiados mensajes en poco tiempo/i;
@@ -32,14 +34,28 @@ const SPAM_PATTERN = /demasiados mensajes en poco tiempo/i;
 export const extractModerationError = (e: unknown): ModerationError => {
   if (e && typeof e === 'object') {
     const axiosErr = e as {
-      response?: { data?: { codigoError?: string; detalle?: string; message?: string } };
+      response?: {
+        data?: {
+          moderationCode?: string;
+          codigoError?: string;
+          ruleExplanation?: string;
+          detalle?: string;
+          message?: string;
+          escalated?: boolean;
+        };
+      };
     };
     const data = axiosErr.response?.data;
-    const code = data?.codigoError;
+    // Backend now sends 'moderationCode'; fallback to legacy 'codigoError' for compat
+    const code = data?.moderationCode ?? data?.codigoError;
     if (typeof code === 'string' && code.startsWith('MO_')) {
-      return { code, detail: data?.detalle };
+      const ruleExplanation = data?.ruleExplanation || undefined;
+      const escalated = data?.escalated === true;
+      // Use detalle for legacy compat, else fall to message (short banner text)
+      const detail = data?.detalle || data?.message;
+      return { code, detail, escalated, ruleExplanation };
     }
-    // MO_003: el backend pierde codigoError al pasar por ValidationError; detectar por mensaje
+    // Fallback: detect MO_003 by message text if moderationCode field is absent
     const msg = typeof data?.message === 'string' ? data.message : '';
     if (SPAM_PATTERN.test(msg)) {
       return { code: 'MO_003', detail: msg };
@@ -54,6 +70,8 @@ export function useModerationFeedback() {
   );
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(() => getRemainingSeconds());
+  const [escalated, setEscalated] = useState(false);
+  const [ruleExplanation, setRuleExplanation] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -63,19 +81,22 @@ export function useModerationFeedback() {
     }
   }, []);
 
+  // Lee el timestamp real en cada tick en vez de decrementar state (prev - 1).
   const startInterval = useCallback(() => {
     clearTimer();
     timerRef.current = setInterval(() => {
-      setCooldownSeconds((prev) => {
-        if (prev <= 1) {
-          clearTimer();
-          spamBlockUntil = 0;
-          setModerationCode(null);
-          setServerMessage(null);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = getRemainingSeconds();
+      if (remaining <= 0) {
+        clearTimer();
+        spamBlockUntil = 0;
+        setModerationCode(null);
+        setServerMessage(null);
+        setEscalated(false);
+        setRuleExplanation(null);
+        setCooldownSeconds(0);
+      } else {
+        setCooldownSeconds(remaining);
+      }
     }, 1000);
   }, [clearTimer]);
 
@@ -88,9 +109,11 @@ export function useModerationFeedback() {
   }, [clearTimer, startInterval]);
 
   const handleModerationError = useCallback(
-    (code: string, detail?: string) => {
+    (code: string, detail?: string, esc?: boolean, ruleExp?: string) => {
       setModerationCode(code);
       setServerMessage(detail ?? null);
+      setEscalated(esc ?? false);
+      setRuleExplanation(ruleExp ?? null);
 
       if (code === 'MO_003') {
         spamBlockUntil = Date.now() + COOLDOWN_DURATION * 1000;
@@ -105,6 +128,8 @@ export function useModerationFeedback() {
     if (moderationCode !== 'MO_003') {
       setModerationCode(null);
       setServerMessage(null);
+      setEscalated(false);
+      setRuleExplanation(null);
     }
   }, [moderationCode]);
 
@@ -129,6 +154,8 @@ export function useModerationFeedback() {
     isBlocked,
     cooldownSeconds,
     displayMessage,
+    escalated,
+    ruleExplanation,
     handleModerationError,
     clearError,
   };
