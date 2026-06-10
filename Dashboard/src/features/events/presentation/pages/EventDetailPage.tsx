@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2, BellOff, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, User, Tag, School, Loader2, BellOff, CheckCircle2, Users } from 'lucide-react';
 import { useEventDetail } from '../hooks/useEventDetail';
 import { useEventSubscription } from '../hooks/useEventSubscription';
+import { useToast } from '@shared/components/ui/ToastProvider';
 
 const formatDate = (dateValue: string): string => {
   const date = new Date(`${dateValue}T00:00:00`);
@@ -50,7 +51,8 @@ function InfoRow({
 export function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const { event, loading, error, retry } = useEventDetail(eventId);
+  const toast = useToast();
+  const { event, loading, error, retry, isActionLoading, registerToEvent, cancelRegistration } = useEventDetail(eventId);
   const { isSubscribed, toggleSubscription, loadingCategory } = useEventSubscription();
 
   if (loading) {
@@ -87,6 +89,24 @@ export function EventDetailPage() {
   const category = event.category?.trim();
   const categorySubscribed = category ? isSubscribed(category) : false;
   const categoryLoading = category ? loadingCategory === category : false;
+
+  const handleRegister = async () => {
+    const res = await registerToEvent();
+    if (res.success) {
+      toast.push('Registro exitoso. Revisa tu correo.', 'success');
+    } else if (res.error) {
+      toast.push(res.error, 'error');
+    }
+  };
+
+  const handleCancel = async () => {
+    const res = await cancelRegistration();
+    if (res.success) {
+      toast.push('Has cancelado tu registro exitosamente.', 'success');
+    } else if (res.error) {
+      toast.push(res.error, 'error');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -182,6 +202,11 @@ export function EventDetailPage() {
           label="Hora"
           value={formatTime(event.event_time)}
         />
+        <InfoRow
+          icon={<Users size={18} className="text-[#C5A059]" />}
+          label="Cupos Disponibles"
+          value={`${event.available_spots} de ${event.capacity}`}
+        />
       </div>
 
       {/* Description */}
@@ -190,6 +215,39 @@ export function EventDetailPage() {
         <p className="text-[15px] leading-relaxed text-slate-600">
           {event.description || 'Sin descripción disponible.'}
         </p>
+      </div>
+
+      {/* Action Area */}
+      <div className="pt-6 pb-12">
+        {event.isRegistered ? (
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isActionLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-red-500 bg-white px-6 py-4 text-base font-bold text-red-500 transition-all hover:bg-red-50 disabled:opacity-50"
+          >
+            {isActionLoading ? <Loader2 className="animate-spin" /> : null}
+            Cancelar Registro
+          </button>
+        ) : event.available_spots > 0 ? (
+          <button
+            type="button"
+            onClick={handleRegister}
+            disabled={isActionLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00284D] px-6 py-4 text-base font-bold text-white transition-all hover:bg-[#003a6b] disabled:opacity-50"
+          >
+            {isActionLoading ? <Loader2 className="animate-spin" /> : null}
+            Registrarme al Evento
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex w-full items-center justify-center rounded-xl bg-slate-200 px-6 py-4 text-base font-bold text-slate-500"
+          >
+            Cupos Agotados
+          </button>
+        )}
       </div>
     </div>
   );
