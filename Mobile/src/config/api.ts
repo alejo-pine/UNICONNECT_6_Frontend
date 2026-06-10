@@ -110,3 +110,18 @@ export function getSocketBaseUrl(): string {
 }
 
 export const SOCKET_BASE_URL = getSocketBaseUrl();
+
+/**
+ * Returns the URL for Auth0 to backend synchronization.
+ * It removes '/api' from the base URL and appends '/auth/sync'.
+ */
+export function getAuthSyncUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_AUTH_SYNC_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.trim();
+
+  // Fallback to auto-detected API URL
+  const baseUrl = getApiBaseUrl();
+  return baseUrl.replace(/\/api\/?$/, '') + '/auth/sync';
+}
+
+export const AUTH_SYNC_URL = getAuthSyncUrl();

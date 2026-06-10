@@ -14,6 +14,10 @@ export interface EventDetail extends EventCardSummary {
   location: string;
   category: string;
   created_at: string;
+  capacity: number;
+  available_spots: number;
+  isRegistered?: boolean;
+  version: number;
 }
 
 export interface ApiErrorResponse {

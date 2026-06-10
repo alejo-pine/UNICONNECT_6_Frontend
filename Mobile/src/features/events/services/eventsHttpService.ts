@@ -121,6 +121,10 @@ export const eventsHttpService = {
         profile_id: rawEvent.profile_id || rawEvent.profileId,
         organizer_name: rawEvent.organizer_name || rawEvent.organizerName,
         created_at: rawEvent.created_at || rawEvent.createdAt,
+        capacity: rawEvent.capacity || 50,
+        available_spots: rawEvent.available_spots ?? rawEvent.availableSpots ?? 50,
+        version: rawEvent.version || 1,
+        isRegistered: rawEvent.isRegistered || false,
       };
 
       return { success: true, data: event };
@@ -246,6 +250,42 @@ export const eventsHttpService = {
     } catch (error) {
       const appError = parseError(error);
       console.error('[eventsHttpService] unsubscribeFromCategory error:', appError.message);
+      return { success: false, error: appError.message };
+    }
+  },
+
+  async registerToEvent(eventId: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/${encodeURIComponent(eventId)}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(getErrorMessage(payload, response.status));
+      return { success: true };
+    } catch (error) {
+      const appError = parseError(error);
+      return { success: false, error: appError.message };
+    }
+  },
+
+  async cancelRegistration(eventId: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/${encodeURIComponent(eventId)}/register`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(getErrorMessage(payload, response.status));
+      return { success: true };
+    } catch (error) {
+      const appError = parseError(error);
       return { success: false, error: appError.message };
     }
   },
