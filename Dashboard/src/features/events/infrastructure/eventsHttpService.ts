@@ -45,26 +45,41 @@ const authHeaders = (token: string) => ({
 });
 
 export const eventsHttpService = {
-  async getEvents(token: string, limit = 20): Promise<ApiResponse<EventCardSummary[]>> {
+  async getEvents(
+    token: string,
+    options: { limit?: number; page?: number; search?: string; categories?: string[] } = {}
+  ): Promise<ApiResponse<{ data: EventCardSummary[]; total: number }>> {
     try {
-      const response = await fetch(`${EVENTS_ENDPOINT}?limit=${limit}`, {
+      const { limit = 10, page = 1, search, categories } = options;
+      
+      const queryParams = new URLSearchParams();
+      queryParams.append('limit', limit.toString());
+      queryParams.append('page', page.toString());
+      if (search) queryParams.append('search', search);
+      if (categories && categories.length > 0) queryParams.append('categories', categories.join(','));
+
+      const response = await fetch(`${EVENTS_ENDPOINT}?${queryParams.toString()}`, {
         headers: authHeaders(token),
       });
       const payload = await readJson(response);
       if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
 
-      const rawData =
-        payload && typeof payload === 'object' && 'data' in payload
-          ? (payload as { data?: any[] }).data
-          : (payload as any[]);
+      const responseData = payload && typeof payload === 'object' && 'data' in payload 
+        ? (payload as any).data 
+        : { data: [], total: 0 };
 
-      const events: EventCardSummary[] = (Array.isArray(rawData) ? rawData : []).map((row) => ({
+      const rawEvents = Array.isArray(responseData.data) ? responseData.data : [];
+      const total = typeof responseData.total === 'number' ? responseData.total : 0;
+
+      const events: EventCardSummary[] = rawEvents.map((row: any) => ({
         ...row,
         event_date: row.event_date || row.eventDate,
         event_time: row.event_time || row.eventTime,
         image_url: row.image_url || row.imageUrl,
+        available_spots: row.available_spots ?? row.availableSpots ?? 50,
+        capacity: row.capacity ?? 50,
       }));
-      return { success: true, data: sortChronological(events) };
+      return { success: true, data: { data: sortChronological(events), total } };
     } catch {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
     }
