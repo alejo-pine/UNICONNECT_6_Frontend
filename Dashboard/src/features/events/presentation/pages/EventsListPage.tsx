@@ -1,11 +1,27 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, ChevronRight, Loader2, Bell, BellOff, CheckCircle2, Plus, X } from 'lucide-react';
+import { Calendar, Clock, ChevronRight, Loader2, Bell, BellOff, CheckCircle2, Plus, X, Search, ChevronLeft, Filter } from 'lucide-react';
 import { useAuthStore } from '@shared/store/authStore';
 import { useEventsFeed } from '../hooks/useEventsFeed';
 import { useEventSubscription, AVAILABLE_CATEGORIES } from '../hooks/useEventSubscription';
 import { eventsHttpService } from '../../infrastructure/eventsHttpService';
 import type { EventCardSummary } from '../../domain/events';
+
+function HighlightText({ text, search }: { text: string; search: string }) {
+  if (!search || search.length < 3) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${search})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === search.toLowerCase() ? (
+          <mark key={i} className="rounded-sm bg-yellow-200 px-0.5 text-ink-900">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 
 const formatDate = (dateValue: string): string => {
   const date = new Date(`${dateValue}T00:00:00`);
@@ -29,37 +45,49 @@ const formatTime = (timeValue: string): string => {
   }).format(d);
 };
 
-function EventCard({ event, onPress }: { event: EventCardSummary; onPress: () => void }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-sm transition hover:shadow-md">
-      {event.image_url?.trim() ? (
-        <img
-          src={event.image_url}
-          alt={event.title}
-          className="h-36 w-full object-cover"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      ) : (
-        <div className="flex h-36 w-full items-center justify-center bg-brand-50">
-          <span
-            className="material-symbols-outlined text-5xl"
-            style={{ color: '#00284D', opacity: 0.15 }}
-          >
-            event
-          </span>
-        </div>
-      )}
+function EventCard({ event, search, onPress }: { event: EventCardSummary; search: string; onPress: () => void }) {
+  const isSoldOut = event.available_spots <= 0;
 
-      <div className="p-4">
-        <h2 className="text-base font-bold text-[#00284D]">{event.title}</h2>
+  return (
+    <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-sm transition hover:shadow-md flex flex-col h-full">
+      <div className="relative">
+        {event.image_url?.trim() ? (
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className={`h-36 w-full object-cover ${isSoldOut ? 'opacity-70 grayscale' : ''}`}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="flex h-36 w-full items-center justify-center bg-brand-50">
+            <span
+              className="material-symbols-outlined text-5xl"
+              style={{ color: '#00284D', opacity: 0.15 }}
+            >
+              event
+            </span>
+          </div>
+        )}
+        
+        {isSoldOut && (
+          <div className="absolute right-3 top-3 rounded-md bg-red-600 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-sm">
+            Cupo Agotado
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col p-4 flex-1">
+        <h2 className="text-base font-bold text-[#00284D]">
+          <HighlightText text={event.title} search={search} />
+        </h2>
         <p className="mt-0.5 text-xs font-bold uppercase tracking-wide text-[#C5A059]">
           {event.faculty || 'Facultad no disponible'}
         </p>
 
-        <p className="mt-2 line-clamp-3 text-sm text-slate-600">
-          {event.description || 'Sin descripción disponible.'}
+        <p className="mt-2 line-clamp-3 text-sm text-slate-600 flex-1">
+          <HighlightText text={event.description || 'Sin descripción disponible.'} search={search} />
         </p>
 
         <div className="mt-3 flex items-center gap-2 text-sm text-slate-700">
@@ -71,11 +99,11 @@ function EventCard({ event, onPress }: { event: EventCardSummary; onPress: () =>
           <span>{formatTime(event.event_time)}</span>
         </div>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-4 flex justify-end pt-2 border-t border-slate-100">
           <button
             type="button"
             onClick={onPress}
-            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-[#C5A059] hover:underline"
+            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-[#00284D] hover:underline"
           >
             Ver más <ChevronRight size={14} />
           </button>
@@ -165,7 +193,13 @@ const FACULTIES = [
 
 export function EventsListPage() {
   const navigate = useNavigate();
-  const { events, loading, error, reload } = useEventsFeed(20);
+  const limit = 10;
+  const { 
+    events, total, loading, error, reload, 
+    search, setSearch, 
+    page, setPage, 
+    categories, handleCategoryToggle 
+  } = useEventsFeed(limit);
   const token = useAuthStore((s) => s.token);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -232,7 +266,7 @@ export function EventsListPage() {
     }
   };
 
-  if (loading) {
+  if (!events && loading) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24">
         <Loader2 size={32} className="animate-spin text-[#00284D]" />
@@ -280,21 +314,93 @@ export function EventsListPage() {
       {/* Subscription panel */}
       <CategorySubscriptionPanel />
 
-      {events.length === 0 ? (
+      <div className="flex flex-col gap-4 rounded-xl border border-ink-100 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Filter size={18} className="text-[#C5A059]" />
+          <h2 className="text-sm font-bold text-[#00284D]">Filtros y Búsqueda</h2>
+        </div>
+
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por título o descripción... (mín. 3 caracteres)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm text-[#00284D] outline-none transition focus:border-[#00284D] focus:ring-2 focus:ring-[#00284D]/10"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          {AVAILABLE_CATEGORIES.map((cat) => {
+            const isSelected = categories.includes(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => handleCategoryToggle(cat)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                  isSelected 
+                    ? 'border-[#00284D] bg-[#00284D] text-white' 
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-[#00284D]'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16">
+          <Loader2 size={32} className="animate-spin text-[#00284D]" />
+          <p className="text-sm text-slate-500">Buscando eventos...</p>
+        </div>
+      ) : events.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16">
           <span className="material-symbols-outlined text-5xl text-[#C5A059]">event_busy</span>
-          <p className="text-lg font-bold text-[#00284D]">No hay eventos por ahora</p>
-          <p className="text-sm text-slate-500">Cuando se publiquen eventos aparecerán aquí.</p>
+          <p className="text-lg font-bold text-[#00284D]">No se encontraron eventos</p>
+          <p className="text-sm text-slate-500">Intenta con otros filtros de búsqueda.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {events.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onPress={() => navigate(`/events/${event.id}`)}
-            />
-          ))}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between text-sm text-slate-500">
+            <p>Mostrando <strong className="text-[#00284D]">{events.length}</strong> de <strong className="text-[#00284D]">{total}</strong> resultados</p>
+          </div>
+          
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {events.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                search={search}
+                onPress={() => navigate(`/events/${event.id}`)}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-center gap-4 pt-6">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 1}
+              className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <span className="text-sm font-bold text-[#00284D]">
+              Página {page} de {Math.ceil(total / limit) || 1}
+            </span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page >= Math.ceil(total / limit)}
+              className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Siguiente <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
 
