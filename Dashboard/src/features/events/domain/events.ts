@@ -6,6 +6,8 @@ export interface EventCardSummary {
   event_date: string;
   event_time: string;
   image_url: string | null;
+  capacity: number;
+  available_spots: number;
 }
 
 export interface EventDetail extends EventCardSummary {
@@ -14,6 +16,8 @@ export interface EventDetail extends EventCardSummary {
   location: string;
   category: string;
   created_at: string;
+  version: number;
+  isRegistered?: boolean;
 }
 
 export interface ApiResponse<T> {

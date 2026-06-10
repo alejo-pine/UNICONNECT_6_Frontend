@@ -93,6 +93,10 @@ export const eventsHttpService = {
         profile_id: rawEvent.profile_id || rawEvent.profileId,
         organizer_name: rawEvent.organizer_name || rawEvent.organizerName,
         created_at: rawEvent.created_at || rawEvent.createdAt,
+        capacity: rawEvent.capacity || 50,
+        available_spots: rawEvent.available_spots ?? rawEvent.availableSpots ?? 50,
+        version: rawEvent.version || 1,
+        isRegistered: rawEvent.isRegistered || false,
       };
 
       return { success: true, data: event };
@@ -163,6 +167,34 @@ export const eventsHttpService = {
       return { success: true };
     } catch {
       return { success: false, error: 'Error de conexión al desuscribirse.' };
+    }
+  },
+
+  async registerToEvent(eventId: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/${encodeURIComponent(eventId)}/register`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión al registrarse al evento.' };
+    }
+  },
+
+  async cancelRegistration(eventId: string, token: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${EVENTS_ENDPOINT}/${encodeURIComponent(eventId)}/register`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return { success: false, error: getErrorMessage(payload, response.status) };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión al cancelar el registro.' };
     }
   },
 };
