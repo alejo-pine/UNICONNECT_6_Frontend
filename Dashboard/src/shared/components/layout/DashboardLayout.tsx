@@ -3,6 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useAuthStore } from '@shared/store/authStore';
 import { NotificationBell } from './NotificationBell';
 import { HeaderProfileAvatar } from './HeaderProfileAvatar';
+import { ChatbotWidget } from '@features/chatbot/presentation/components/ChatbotWidget';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -127,6 +128,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </button>
         </div>
       </aside>
+
+      {/* ── Chatbot widget (fixed, position independent of flex layout) ── */}
+      <ChatbotWidget />
 
       {/* ── Main area ───────────────────────────────────────────── */}
       <div className="ml-64 flex flex-1 flex-col h-screen overflow-hidden">
