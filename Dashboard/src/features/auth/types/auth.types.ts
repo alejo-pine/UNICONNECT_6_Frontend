@@ -18,6 +18,7 @@ export interface AuthSession {
   token: string | null;
   userId: string;
   needsOnboarding: boolean;
+  role?: string;
 }
 
 export interface AuthSyncResponse {
@@ -29,6 +30,7 @@ export interface AuthSyncResponse {
   id?: string;
   needsOnboarding?: boolean;
   needs_onboarding?: boolean;
+  role?: string;
   data?: AuthSyncResponse;
   user?: AuthSyncResponse;
   profile?: AuthSyncResponse;

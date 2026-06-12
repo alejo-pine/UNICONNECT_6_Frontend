@@ -9,27 +9,29 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
-  { to: '/profile', label: 'Perfil', icon: 'person' },
-  { to: '/chat', label: 'Mensajes', icon: 'chat' },
-  { to: '/groups', label: 'Grupos', icon: 'group' },
-  { to: '/events', label: 'Eventos', icon: 'event' },
-  { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
-  { to: '/forum', label: 'Foros', icon: 'forum' },
-  { to: '/admin/moderation', label: 'Moderación', icon: 'admin_panel_settings' },
-];
-
-const getNavLabel = (pathname: string) => {
-  const match = navItems.find(
-    (n) => pathname === n.to || pathname.startsWith(`${n.to}/`)
-  );
-  return match?.label ?? 'Panel';
-};
-
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const { logout: auth0Logout } = useAuth0();
   const clearSession = useAuthStore((state) => state.clearSession);
+  const role = useAuthStore((state) => state.role);
+
+  const navItems = [
+    { to: '/profile', label: 'Perfil', icon: 'person' },
+    { to: '/chat', label: 'Mensajes', icon: 'chat' },
+    { to: '/groups', label: 'Grupos', icon: 'group' },
+    { to: '/events', label: 'Eventos', icon: 'event' },
+    { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
+    { to: '/forum', label: 'Foros', icon: 'forum' },
+    { to: '/admin/moderation', label: 'Moderación', icon: 'admin_panel_settings' },
+    ...(role === 'super_admin' ? [{ to: '/admin/categories', label: 'Categorías', icon: 'category' }] : []),
+  ];
+
+  const getNavLabel = (pathname: string) => {
+    const match = navItems.find(
+      (n) => pathname === n.to || pathname.startsWith(`${n.to}/`)
+    );
+    return match?.label ?? 'Panel';
+  };
 
   const onLogout = () => {
     clearSession();

@@ -5,7 +5,8 @@ interface AuthState {
   token: string | null;
   needsOnboarding: boolean;
   isHydrating: boolean;
-  setSession: (session: { userId: string; token: string | null; needsOnboarding?: boolean }) => void;
+  role: string | null;
+  setSession: (session: { userId: string; token: string | null; needsOnboarding?: boolean; role?: string }) => void;
   setHydrated: () => void;
   clearSession: () => void;
 }
@@ -15,9 +16,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   needsOnboarding: false,
   isHydrating: true,
+  role: null,
 
-  setSession: ({ userId, token, needsOnboarding = false }) => {
-    set({ userId, token, needsOnboarding, isHydrating: false });
+  setSession: ({ userId, token, needsOnboarding = false, role = 'user' }) => {
+    set({ userId, token, needsOnboarding, role, isHydrating: false });
   },
 
   setHydrated: () => {
@@ -25,6 +27,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearSession: () => {
-    set({ userId: null, token: null, needsOnboarding: false, isHydrating: false });
+    set({ userId: null, token: null, needsOnboarding: false, role: null, isHydrating: false });
   },
 }));

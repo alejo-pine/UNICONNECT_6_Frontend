@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, ChevronRight, Loader2, Bell, BellOff, CheckCircle2, Plus, X, Search, ChevronLeft, Filter } from 'lucide-react';
 import { useAuthStore } from '@shared/store/authStore';
 import { useEventsFeed } from '../hooks/useEventsFeed';
-import { useEventSubscription, AVAILABLE_CATEGORIES } from '../hooks/useEventSubscription';
+import { useEventSubscription } from '../hooks/useEventSubscription';
+import { useCategories } from '../hooks/useCategories';
 import { eventsHttpService } from '../../infrastructure/eventsHttpService';
 import type { EventCardSummary } from '../../domain/events';
 
@@ -113,7 +114,7 @@ function EventCard({ event, search, onPress }: { event: EventCardSummary; search
   );
 }
 
-function CategorySubscriptionPanel() {
+function CategorySubscriptionPanel({ availableCategories, loadingCategories }: { availableCategories: string[], loadingCategories: boolean }) {
   const { isSubscribed, toggleSubscription, loadingCategory, loadingInit, error } = useEventSubscription();
 
   return (
@@ -134,7 +135,7 @@ function CategorySubscriptionPanel() {
         <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
       )}
 
-      {loadingInit ? (
+      {loadingInit || loadingCategories ? (
         <div className="flex flex-wrap gap-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
@@ -145,7 +146,7 @@ function CategorySubscriptionPanel() {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {AVAILABLE_CATEGORIES.map((category) => {
+          {availableCategories.map((category) => {
             const subscribed = isSubscribed(category);
             const loading = loadingCategory === category;
 
@@ -202,10 +203,13 @@ export function EventsListPage() {
   } = useEventsFeed(limit);
   const token = useAuthStore((s) => s.token);
 
+  const { categories: dynamicCategories, loadingCategories } = useCategories();
+  const availableCategories = dynamicCategories.map(c => c.name);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
     title: '',
-    category: AVAILABLE_CATEGORIES[0] as string,
+    category: '',
     description: '',
     imageUrl: '',
     eventDate: new Date().toISOString().split('T')[0],
@@ -252,7 +256,7 @@ export function EventsListPage() {
       setCreateSuccess(`Evento "${form.title}" creado. Las notificaciones han sido enviadas a los suscritos de "${form.category}".`);
       setForm({
         title: '',
-        category: AVAILABLE_CATEGORIES[0],
+        category: availableCategories[0] || '',
         description: '',
         imageUrl: '',
         eventDate: new Date().toISOString().split('T')[0],
@@ -303,7 +307,14 @@ export function EventsListPage() {
         <button
           id="btn-crear-evento"
           type="button"
-          onClick={() => { setModalOpen(true); setCreateError(null); setCreateSuccess(null); }}
+          onClick={() => { 
+            setModalOpen(true); 
+            setCreateError(null); 
+            setCreateSuccess(null); 
+            if (!form.category && availableCategories.length > 0) {
+              setForm(f => ({ ...f, category: availableCategories[0] }));
+            }
+          }}
           className="flex items-center gap-2 self-start rounded-xl bg-[#C5A059] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#b08840] sm:self-auto"
         >
           <Plus size={16} />
@@ -312,7 +323,7 @@ export function EventsListPage() {
       </div>
 
       {/* Subscription panel */}
-      <CategorySubscriptionPanel />
+      <CategorySubscriptionPanel availableCategories={availableCategories} loadingCategories={loadingCategories} />
 
       <div className="flex flex-col gap-4 rounded-xl border border-ink-100 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -334,7 +345,7 @@ export function EventsListPage() {
         </div>
 
         <div className="flex flex-wrap gap-2 pt-2">
-          {AVAILABLE_CATEGORIES.map((cat) => {
+          {availableCategories.map((cat) => {
             const isSelected = categories.includes(cat);
             return (
               <button
@@ -461,7 +472,7 @@ export function EventsListPage() {
                   onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-[#00284D] outline-none transition focus:border-[#00284D] focus:ring-2 focus:ring-[#00284D]/10"
                 >
-                  {AVAILABLE_CATEGORIES.map((cat) => (
+                  {availableCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>

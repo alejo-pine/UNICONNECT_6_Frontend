@@ -14,6 +14,7 @@ import { SearchPage, PublicProfilePage } from '@features/search';
 import { ProfilePage } from '@features/profile/presentation/pages/ProfilePage';
 import { ForumSubjectsPage, ForumQuestionsPage, ForumQuestionDetailPage } from '@features/forum';
 import { ModerationHistoryPage } from '@features/admin/presentation/pages/ModerationHistoryPage';
+import { AdminCategoriesPage } from '@features/admin/presentation/pages/AdminCategoriesPage';
 import { OnboardingWelcomePage } from '@features/onboarding/presentation/pages/OnboardingWelcomePage';
 import { OnboardingStepOnePage } from '@features/onboarding/presentation/pages/OnboardingStepOnePage';
 import { OnboardingSubjectsPage } from '@features/onboarding/presentation/pages/OnboardingSubjectsPage';
@@ -121,6 +122,7 @@ export function AppRouter() {
         <Route path="/forum/:subjectId" element={<ForumQuestionsPage />} />
         <Route path="/forum/:subjectId/question/:questionId" element={<ForumQuestionDetailPage />} />
         <Route path="/admin/moderation" element={<ModerationHistoryPage />} />
+        <Route path="/admin/categories" element={<AdminCategoriesPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/groups" replace />} />

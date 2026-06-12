@@ -50,15 +50,16 @@ function App() {
             userId: session.userId,
             token: session.token,
             needsOnboarding: session.needsOnboarding,
+            role: session.role,
           });
         } catch {
           // Sync failed: mark hydrated but do NOT reset needsOnboarding.
           // User lands on /groups; they can retry if needed.
-          setSession({ userId: user.sub!, token: null, needsOnboarding: false });
+          setSession({ userId: user.sub!, token: null, needsOnboarding: false, role: 'user' });
         }
       } else {
         // No sync URL configured – treat as no onboarding needed
-        setSession({ userId: user.sub!, token: null, needsOnboarding: false });
+        setSession({ userId: user.sub!, token: null, needsOnboarding: false, role: 'user' });
       }
     };
 
