@@ -70,6 +70,91 @@ function TypingDots() {
 
 // ─── Main Widget ─────────────────────────────────────────────────────────────
 
+function FeedbackButtons({ 
+  question, 
+  response, 
+  references 
+}: { 
+  question: string; 
+  response: string; 
+  references?: any[]; 
+}) {
+  const [status, setStatus] = useState<'idle' | 'useful' | 'not_useful' | 'submitting' | 'done'>('idle');
+  const [comment, setComment] = useState('');
+
+  const submitFeedback = async (rating: boolean, text?: string) => {
+    setStatus('submitting');
+    await chatbotHttpService.submitFeedback({
+      question,
+      response,
+      rating,
+      comments: text,
+      references,
+    });
+    setStatus('done');
+  };
+
+  if (status === 'done') {
+    return <p className="text-[10px] text-slate-400 mt-1 pl-1">¡Gracias por tu opinión!</p>;
+  }
+
+  if (status === 'not_useful') {
+    return (
+      <div className="mt-2 rounded-xl bg-white p-3 border border-slate-200 shadow-sm flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+        <p className="text-xs font-semibold text-[#00284D]">¿En qué podemos mejorar?</p>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Opcional: Detalles sobre por qué no fue útil..."
+          className="w-full text-xs p-2 rounded-md border border-slate-200 focus:outline-none focus:border-[#00284D]"
+          rows={2}
+        />
+        <div className="flex gap-2 justify-end">
+          <button 
+            type="button" 
+            onClick={() => setStatus('idle')}
+            className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="button"
+            onClick={() => void submitFeedback(false, comment)}
+            className="text-xs bg-[#00284D] text-white px-3 py-1 rounded-md"
+          >
+            Enviar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-4 mt-1.5 pl-1 opacity-60 hover:opacity-100 transition-opacity">
+      <button
+        type="button"
+        disabled={status === 'submitting'}
+        onClick={() => void submitFeedback(true)}
+        className="text-slate-400 hover:text-green-600 transition-colors flex items-center gap-1 text-xs font-medium"
+        title="Útil"
+      >
+        <span className="material-symbols-outlined text-[16px]">thumb_up</span>
+        Útil
+      </button>
+      <button
+        type="button"
+        disabled={status === 'submitting'}
+        onClick={() => setStatus('not_useful')}
+        className="text-slate-400 hover:text-red-600 transition-colors flex items-center gap-1 text-xs font-medium"
+        title="No útil"
+      >
+        <span className="material-symbols-outlined text-[16px]">thumb_down</span>
+        No útil
+      </button>
+    </div>
+  );
+}
+
 export function ChatbotWidget() {
   const {
     isOpen,
@@ -479,7 +564,7 @@ export function ChatbotWidget() {
                 )}
 
                 {/* Message bubbles */}
-                {messages.map((msg) => (
+                {messages.map((msg, index) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
@@ -539,6 +624,15 @@ export function ChatbotWidget() {
                               </a>
                             ))}
                           </div>
+                        )}
+
+                        {/* Feedback Buttons */}
+                        {msg.status === 'success' && index > 0 && messages[index - 1].role === 'user' && (
+                          <FeedbackButtons
+                            question={messages[index - 1].content}
+                            response={msg.content}
+                            references={msg.references}
+                          />
                         )}
                       </div>
                     )}

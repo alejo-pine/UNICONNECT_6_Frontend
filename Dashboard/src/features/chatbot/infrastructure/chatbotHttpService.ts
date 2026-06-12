@@ -71,4 +71,40 @@ export const chatbotHttpService = {
       return [];
     }
   },
+
+  async submitFeedback(payload: {
+    question: string;
+    response: string;
+    rating: boolean;
+    comments?: string;
+    references?: any[];
+  }): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await chatFetch('/chatbot/feedback', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const json = await readJson(res);
+      if (!res.ok) {
+        return { success: false, error: 'Error al enviar feedback.' };
+      }
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  },
+
+  async getFeedbackReport(page: number = 1, limit: number = 10): Promise<{ success: boolean; data?: any[]; total?: number; error?: string }> {
+    try {
+      const res = await chatFetch(`/chatbot/feedback?page=${page}&limit=${limit}`);
+      const json = await readJson(res);
+      if (!res.ok) {
+        return { success: false, error: 'Error al obtener reporte.' };
+      }
+      const dataObj = json as { success: boolean; data: any[]; total: number };
+      return { success: true, data: dataObj.data, total: dataObj.total };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  }
 };
