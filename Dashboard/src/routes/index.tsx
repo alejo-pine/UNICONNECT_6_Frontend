@@ -15,6 +15,7 @@ import { ProfilePage } from '@features/profile/presentation/pages/ProfilePage';
 import { ForumSubjectsPage, ForumQuestionsPage, ForumQuestionDetailPage } from '@features/forum';
 import { ModerationHistoryPage } from '@features/admin/presentation/pages/ModerationHistoryPage';
 import { AdminCategoriesPage } from '@features/admin/presentation/pages/AdminCategoriesPage';
+import { AdminChatbotFeedbackPage } from '@features/admin/presentation/pages/AdminChatbotFeedbackPage';
 import { OnboardingWelcomePage } from '@features/onboarding/presentation/pages/OnboardingWelcomePage';
 import { OnboardingStepOnePage } from '@features/onboarding/presentation/pages/OnboardingStepOnePage';
 import { OnboardingSubjectsPage } from '@features/onboarding/presentation/pages/OnboardingSubjectsPage';
@@ -123,6 +124,7 @@ export function AppRouter() {
         <Route path="/forum/:subjectId/question/:questionId" element={<ForumQuestionDetailPage />} />
         <Route path="/admin/moderation" element={<ModerationHistoryPage />} />
         <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+        <Route path="/admin/chatbot-feedback" element={<AdminChatbotFeedbackPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/groups" replace />} />

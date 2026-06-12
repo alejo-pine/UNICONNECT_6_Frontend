@@ -22,8 +22,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { to: '/events', label: 'Eventos', icon: 'event' },
     { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
     { to: '/forum', label: 'Foros', icon: 'forum' },
-    { to: '/admin/moderation', label: 'Moderación', icon: 'admin_panel_settings' },
-    ...(role === 'super_admin' ? [{ to: '/admin/categories', label: 'Categorías', icon: 'category' }] : []),
+    ...(role === 'super_admin' ? [
+      { to: '/admin/moderation', label: 'Moderación', icon: 'admin_panel_settings' },
+      { to: '/admin/categories', label: 'Categorías', icon: 'category' },
+      { to: '/admin/chatbot-feedback', label: 'Feedback Chatbot', icon: 'feedback' },
+    ] : []),
   ];
 
   const getNavLabel = (pathname: string) => {
