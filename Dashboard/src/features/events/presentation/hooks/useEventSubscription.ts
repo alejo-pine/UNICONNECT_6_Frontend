@@ -2,18 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAuthStore } from '@shared/store/authStore';
 import { eventsHttpService } from '../../infrastructure/eventsHttpService';
 
-export const AVAILABLE_CATEGORIES = [
-  'Académico',
-  'Cultural',
-  'Deportivo',
-  'Tecnología',
-  'Salud',
-  'Arte',
-  'Emprendimiento',
-  'Social',
-] as const;
-
-export type EventCategory = (typeof AVAILABLE_CATEGORIES)[number];
+export type EventCategory = string;
 
 interface UseEventSubscriptionReturn {
   subscribedCategories: Set<string>;
