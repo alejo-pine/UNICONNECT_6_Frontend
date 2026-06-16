@@ -307,17 +307,26 @@ export function StudySessionsSection({ groupId, isAdmin }: { groupId: string; is
           return (
             <button key={key}
               onClick={() => hasSessions && setSelectedKey(p => p === key ? null : key)}
-              className="relative flex flex-col items-center justify-center aspect-square rounded-full transition"
+              className="relative flex items-center justify-center aspect-square rounded-full transition-all"
               style={{
-                background: isSelected ? '#D4AF37' : isToday ? '#001c39' : 'transparent',
+                background: isSelected ? '#D4AF37' : isToday ? '#001c39' : hasSessions ? '#FFF9E6' : 'transparent',
                 color: (isSelected || isToday) ? '#fff' : '#00132a',
+                border: hasSessions && !isSelected && !isToday ? '2px solid #D4AF37' : '2px solid transparent',
                 cursor: hasSessions ? 'pointer' : 'default',
                 opacity: hasSessions || isToday ? 1 : 0.55,
               }}>
-              <span className="text-xs font-medium leading-none">{day}</span>
+              <span className={`leading-none ${hasSessions ? 'font-bold text-sm' : 'font-medium text-xs'}`}>{day}</span>
               {hasSessions && (
-                <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full"
-                  style={{ background: (isSelected || isToday) ? '#fff' : '#D4AF37' }} />
+                <span 
+                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full shadow-md"
+                  style={{ 
+                    background: (isSelected || isToday) ? '#fff' : '#D4AF37',
+                    color: (isSelected || isToday) ? '#D4AF37' : '#fff',
+                    fontSize: '10px'
+                  }}
+                >
+                  ★
+                </span>
               )}
             </button>
           );

@@ -119,7 +119,7 @@ export const eventsHttpService = {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
     }
   },
-  async createEvent(payload: { title: string; category: string; description?: string; imageUrl?: string; eventDate: string; eventTime: string; location?: string; faculty?: string }, token: string): Promise<ApiResponse<{ id: string; title: string; category: string }>> {
+  async createEvent(payload: { title: string; category: string; description?: string; imageUrl?: string; eventDate: string; eventTime: string; location?: string; faculty?: string; capacity?: number }, token: string): Promise<ApiResponse<{ id: string; title: string; category: string }>> {
     try {
       const response = await fetch(EVENTS_ENDPOINT, {
         method: 'POST',

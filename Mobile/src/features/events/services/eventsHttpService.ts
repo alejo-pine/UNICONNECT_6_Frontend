@@ -214,6 +214,7 @@ export const eventsHttpService = {
       eventTime: string;
       location?: string;
       faculty?: string;
+      capacity?: number;
     },
     token: string
   ): Promise<ApiResponse<{ id: string; title: string; category: string }>> {

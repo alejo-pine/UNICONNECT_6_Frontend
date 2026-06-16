@@ -332,23 +332,35 @@ export function GroupManagementScreen() {
           )}
 
           {(isMember || isAdmin) && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.dangerButton]}
-              onPress={handleLeave}
-              disabled={actionLoading}
-              activeOpacity={0.8}
-            >
-              {actionLoading ? (
-                <ActivityIndicator size="small" color={colors.danger} />
-              ) : (
-                <>
-                  <MaterialIcons name="exit-to-app" size={20} color={colors.danger} />
-                  <Text style={[styles.actionButtonText, { color: colors.danger }]}>
-                    Salir del grupo
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
+                onPress={() => router.push({ pathname: '/study-groups/wall', params: { groupId, groupName: group?.name } })}
+                disabled={actionLoading}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="chat" size={20} color="#FFFFFF" />
+                <Text style={styles.actionButtonText}>Ir al chat</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.dangerButton, { flex: 1 }]}
+                onPress={handleLeave}
+                disabled={actionLoading}
+                activeOpacity={0.8}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator size="small" color={colors.danger} />
+                ) : (
+                  <>
+                    <MaterialIcons name="exit-to-app" size={20} color={colors.danger} />
+                    <Text style={[styles.actionButtonText, { color: colors.danger }]}>
+                      Salir del grupo
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           )}
 
           {isAdmin && (

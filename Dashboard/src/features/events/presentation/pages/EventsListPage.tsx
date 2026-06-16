@@ -215,7 +215,8 @@ export function EventsListPage() {
     eventDate: new Date().toISOString().split('T')[0],
     eventTime: '12:00',
     location: '',
-    faculty: FACULTIES[0]
+    faculty: FACULTIES[0],
+    capacity: ''
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -248,6 +249,7 @@ export function EventsListPage() {
         eventTime: form.eventTime,
         location: form.location.trim() || undefined,
         faculty: form.faculty.trim() || undefined,
+        capacity: form.capacity ? parseInt(form.capacity, 10) : undefined
       },
       token
     );
@@ -262,7 +264,8 @@ export function EventsListPage() {
         eventDate: new Date().toISOString().split('T')[0],
         eventTime: '12:00',
         location: '',
-        faculty: FACULTIES[0]
+        faculty: FACULTIES[0],
+        capacity: ''
       });
       void reload();
     } else {
@@ -551,6 +554,21 @@ export function EventsListPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="event-capacity" className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Cupos disponibles (opcional)
+                </label>
+                <input
+                  id="event-capacity"
+                  type="number"
+                  min="1"
+                  value={form.capacity}
+                  onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                  placeholder="Ej: 50"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-[#00284D] outline-none transition focus:border-[#00284D] focus:ring-2 focus:ring-[#00284D]/10"
+                />
               </div>
 
               <div className="space-y-1">
