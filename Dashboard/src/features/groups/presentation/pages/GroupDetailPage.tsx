@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import { Button } from '@shared/components/ui/Button';
 import { Card } from '@shared/components/ui/Card';
@@ -51,6 +51,7 @@ const toRenderablePerson = (userId: string, profile?: UserProfileSummary): UserP
 
 export function GroupDetailPage() {
   const { groupId = '' } = useParams();
+  const navigate = useNavigate();
   const currentUserId = useAuthStore((state) => state.userId);
   const token = useAuthStore((state) => state.token);
   const [group, setGroup] = useState<StudyGroup | null>(null);
@@ -395,7 +396,20 @@ export function GroupDetailPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="font-serif font-bold" style={{ fontSize: '28px', color: '#00132a', letterSpacing: '-0.01em' }}>{group.name}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="font-serif font-bold" style={{ fontSize: '28px', color: '#00132a', letterSpacing: '-0.01em' }}>{group.name}</h1>
+        {Boolean(currentUserId && memberIds.includes(currentUserId)) && (
+          <Button 
+            onClick={() => navigate(`/chat/groups/${groupId}/wall`)}
+            type="button"
+            className="flex-shrink-0 flex items-center justify-center gap-2"
+            style={{ background: '#00284D', color: '#fff' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>chat</span>
+            Ir al chat
+          </Button>
+        )}
+      </div>
 
       <Card className="space-y-4">
         <div className="space-y-3">

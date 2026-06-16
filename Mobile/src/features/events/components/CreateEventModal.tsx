@@ -49,6 +49,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const [eventTime, setEventTime] = useState('12:00');
   const [location, setLocation] = useState('');
   const [faculty, setFaculty] = useState(FACULTIES[0] ?? '');
+  const [capacity, setCapacity] = useState('');
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -84,6 +85,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     setEventTime('12:00');
     setLocation('');
     setFaculty(FACULTIES[0] ?? '');
+    setCapacity('');
   };
 
   const handleCreate = async () => {
@@ -112,6 +114,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       eventTime: eventTime.trim(),
       location: location.trim() || undefined,
       faculty: faculty.trim() || undefined,
+      capacity: capacity ? parseInt(capacity, 10) : undefined,
     };
 
     const response = await eventsHttpService.createEvent(payload, token);
@@ -248,6 +251,16 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                 ))}
               </ScrollView>
             </View>
+
+            <Text style={styles.label}>Cupos disponibles (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: 50"
+              value={capacity}
+              onChangeText={setCapacity}
+              keyboardType="number-pad"
+              editable={!isSubmitting}
+            />
 
             <Text style={styles.label}>URL de Imagen</Text>
             <TextInput

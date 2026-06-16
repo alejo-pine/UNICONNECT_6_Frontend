@@ -252,23 +252,32 @@ export function StudySessionsCalendar({ sessions, isAdmin, groupId, onRefresh }:
               key={key}
               style={[
                 styles.cell,
-                isToday && { backgroundColor: colors.primary },
-                isSelected && hasSessions && !isToday && { backgroundColor: colors.accent },
+                hasSessions && !isSelected && !isToday && { backgroundColor: '#FFF9E6', borderWidth: 2, borderColor: colors.accent },
+                isToday && { backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.primary },
+                isSelected && hasSessions && !isToday && { backgroundColor: colors.accent, borderWidth: 2, borderColor: colors.accent },
+                !hasSessions && !isToday && { borderWidth: 2, borderColor: 'transparent' },
               ]}
               activeOpacity={hasSessions ? 0.7 : 1}
               onPress={() => handleDayPress(key)}
             >
               <Text style={[
                 styles.dayNum,
+                hasSessions ? { fontWeight: 'bold', fontSize: 13 } : { fontWeight: '500', fontSize: 12 },
                 { color: (isToday || (isSelected && hasSessions)) ? '#fff' : colors.text },
               ]}>
                 {day}
               </Text>
               {hasSessions && (
                 <View style={[
-                  styles.dot,
-                  { backgroundColor: isToday || (isSelected && hasSessions) ? '#fff' : colors.primary },
-                ]} />
+                  styles.badge,
+                  { backgroundColor: isToday || (isSelected && hasSessions) ? '#fff' : colors.accent },
+                ]}>
+                  <Text style={{ 
+                    color: isToday || (isSelected && hasSessions) ? colors.accent : '#fff', 
+                    fontSize: 8,
+                    lineHeight: 10
+                  }}>★</Text>
+                </View>
               )}
             </TouchableOpacity>
           );
@@ -586,7 +595,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   dayNum: { fontSize: 12, fontWeight: '500' },
-  dot: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 3 },
+  badge: { width: 14, height: 14, borderRadius: 7, position: 'absolute', top: -2, right: -2, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1, elevation: 2 },
   emptyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   emptyText: { fontSize: 13 },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, marginBottom: 10 },
