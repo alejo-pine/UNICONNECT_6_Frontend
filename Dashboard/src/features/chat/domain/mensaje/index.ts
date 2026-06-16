@@ -5,3 +5,4 @@ export { MensajeConArchivo } from './MensajeConArchivo';
 export { MensajeConMencion } from './MensajeConMencion';
 export { MensajeConReaccion } from './MensajeConReaccion';
 export type { Reaccion } from './MensajeConReaccion';
+export { MensajeConEncuesta } from './MensajeConEncuesta';

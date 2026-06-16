@@ -2,6 +2,20 @@ export interface Subject {
   id: string;
   name: string;
 }
+
+export interface ProfileStatistics {
+  createdGroupsCount: number;
+  joinedGroupsCount: number;
+  messagesSentCount: number;
+}
+
+export interface ProfileBadge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlockedAt: string;
+}
 /*
 export interface ProfileData {
   career: string;
@@ -24,6 +38,9 @@ export interface ProfileData {
   phone_number?: string | null; // Número de teléfono
   created_at?: string;    // Fecha de creación
   materias?: Subject[];    // Se mantiene para la lógica de la App (tabla intermedia)
+  subjects?: string[];
+  statistics?: ProfileStatistics;
+  badges?: ProfileBadge[];
 }
 
 export interface Career {

@@ -14,6 +14,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWall } from "../hooks/useWall";
 import { wallHttpService } from "../services/wallHttpService";
+import { useWallStore } from "../../../store/wallStore";
+import {
+  extractModerationError,
+  useModerationFeedback,
+} from "../../chat/hooks/useModerationFeedback";
 import type { WallPostAttachment } from "../types/wall.types";
 import { WallInput } from "../components/WallInput";
 import { WallPostBubble } from "../components/WallPostBubble";
@@ -34,17 +39,23 @@ export const WallScreen: React.FC = () => {
     error,
     loadMorePosts,
     sendPost,
+    createPoll,
     uploadAndSendPost,
     userId,
   } = useWall(groupId);
 
+  const { updatePoll } = useWallStore();
+
   const [isSending, setIsSending] = useState(false);
+  const { isBlocked, displayMessage, escalated, ruleExplanation, handleModerationError, clearError } =
+    useModerationFeedback();
 
   const resolvedGroupName = groupName ? decodeURIComponent(groupName) : "Muro del Grupo";
 
   const handleSend = async (content?: string, file?: any) => {
-    if (!groupId) return;
+    if (!groupId || isBlocked) return;
     setIsSending(true);
+    clearError();
     try {
       if (file) {
         await uploadAndSendPost(groupId, file.uri, file.name, file.mimeType, file.size);
@@ -52,10 +63,28 @@ export const WallScreen: React.FC = () => {
         await sendPost(groupId, content);
       }
     } catch (e) {
-      console.error("Failed to send post:", e);
+      const { code, detail, escalated: esc, ruleExplanation: ruleExp } = extractModerationError(e);
+      if (code) {
+        handleModerationError(code, detail, esc, ruleExp);
+      } else {
+        console.error("Failed to send post:", e);
+      }
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSendPoll = async ({
+    question,
+    options,
+    durationMinutes,
+  }: {
+    question: string;
+    options: string[];
+    durationMinutes: number;
+  }) => {
+    if (!groupId) return;
+    await createPoll(groupId, question, options, durationMinutes);
   };
 
   const handleAttachmentPress = async (attachment: WallPostAttachment) => {
@@ -65,6 +94,24 @@ export const WallScreen: React.FC = () => {
       if (url) await WebBrowser.openBrowserAsync(url);
     } catch (e) {
       console.error("Failed to open attachment:", e);
+    }
+  };
+
+  const handlePollVote = async (pollId: string, optionId: string) => {
+    try {
+      const poll = await wallHttpService.votePoll(pollId, optionId);
+      updatePoll(poll);
+    } catch (e) {
+      console.error("Failed to vote:", e);
+    }
+  };
+
+  const handlePollClose = async (pollId: string) => {
+    try {
+      const poll = await wallHttpService.closePoll(pollId);
+      updatePoll(poll);
+    } catch (e) {
+      console.error("Failed to close poll:", e);
     }
   };
 
@@ -80,7 +127,6 @@ export const WallScreen: React.FC = () => {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      {/* Oculta el header del Stack; usamos uno propio dentro del KAV (igual que ChatScreen) */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <View
@@ -122,11 +168,14 @@ export const WallScreen: React.FC = () => {
             keyExtractor={(item, index) => String(item.id || index)}
             inverted
             shouldRasterizeIOS={true}
+            extraData={posts}
             renderItem={({ item }) => (
               <WallPostBubble
                 post={item}
                 isOwnPost={item.senderId === userId}
                 onAttachmentPress={handleAttachmentPress}
+                onPollVote={handlePollVote}
+                onPollClose={item.senderId === userId ? handlePollClose : undefined}
               />
             )}
             onEndReached={handleEndReached}
@@ -139,7 +188,16 @@ export const WallScreen: React.FC = () => {
             }
           />
         )}
-        <WallInput onSend={handleSend} isSending={isSending} />
+        <WallInput
+          onSend={handleSend}
+          onSendPoll={handleSendPoll}
+          isSending={isSending}
+          moderationMessage={displayMessage}
+          isBlocked={isBlocked}
+          onTyping={clearError}
+          ruleExplanation={ruleExplanation}
+          escalated={escalated}
+        />
       </View>
     </KeyboardAvoidingView>
   );

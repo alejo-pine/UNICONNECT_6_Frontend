@@ -13,6 +13,7 @@ import type { AuthConfig, AuthenticatedUser, AuthError, AuthSessionResult } from
 import { createAuthError, createConfigError, createInvalidDomainError, handleAuthSessionError } from '../utils/authErrors';
 import { isValidInstitutionalEmail, validateAuthConfig } from '../utils/authValidation';
 import { authLogger } from '../utils/logger';
+import { AUTH_SYNC_URL } from '@/src/config/api';
 
 const AUTH_CALLBACK_PATH = 'auth/callback';
 
@@ -31,7 +32,7 @@ export function useAuthLogin() {
       connection: process.env.EXPO_PUBLIC_AUTH0_CONNECTION ?? 'google-oauth2',
       audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
       redirectScheme: process.env.EXPO_PUBLIC_AUTH0_REDIRECT_SCHEME ?? 'uniconnect2',
-      authSyncUrl: process.env.EXPO_PUBLIC_AUTH_SYNC_URL ?? '',
+      authSyncUrl: AUTH_SYNC_URL,
       redirectUri: process.env.EXPO_PUBLIC_AUTH0_REDIRECT_URI?.trim(),
     }),
     []

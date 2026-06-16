@@ -3,28 +3,38 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useAuthStore } from '@shared/store/authStore';
 import { NotificationBell } from './NotificationBell';
 import { HeaderProfileAvatar } from './HeaderProfileAvatar';
+import { ChatbotWidget } from '@features/chatbot/presentation/components/ChatbotWidget';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
-  { to: '/groups', label: 'Grupos', icon: 'group' },
-  { to: '/chat', label: 'Mensajes', icon: 'chat' },
-  { to: '/profile', label: 'Perfil', icon: 'person' },
-];
-
-const getNavLabel = (pathname: string) => {
-  const match = navItems.find(
-    (n) => pathname === n.to || pathname.startsWith(`${n.to}/`)
-  );
-  return match?.label ?? 'Panel';
-};
-
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const { logout: auth0Logout } = useAuth0();
   const clearSession = useAuthStore((state) => state.clearSession);
+  const role = useAuthStore((state) => state.role);
+
+  const navItems = [
+    { to: '/profile', label: 'Perfil', icon: 'person' },
+    { to: '/chat', label: 'Mensajes', icon: 'chat' },
+    { to: '/groups', label: 'Grupos', icon: 'group' },
+    { to: '/events', label: 'Eventos', icon: 'event' },
+    { to: '/search', label: 'Buscar compañeros', icon: 'manage_search' },
+    { to: '/forum', label: 'Foros', icon: 'forum' },
+    ...(role === 'super_admin' ? [
+      { to: '/admin/moderation', label: 'Moderación', icon: 'admin_panel_settings' },
+      { to: '/admin/categories', label: 'Categorías', icon: 'category' },
+      { to: '/admin/chatbot-feedback', label: 'Feedback Chatbot', icon: 'feedback' },
+    ] : []),
+  ];
+
+  const getNavLabel = (pathname: string) => {
+    const match = navItems.find(
+      (n) => pathname === n.to || pathname.startsWith(`${n.to}/`)
+    );
+    return match?.label ?? 'Panel';
+  };
 
   const onLogout = () => {
     clearSession();
@@ -124,8 +134,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </aside>
 
+      {/* ── Chatbot widget (fixed, position independent of flex layout) ── */}
+      <ChatbotWidget />
+
       {/* ── Main area ───────────────────────────────────────────── */}
-      <div className="ml-64 flex flex-1 flex-col min-h-screen">
+      <div className="ml-64 flex flex-1 flex-col h-screen overflow-hidden">
         {/* Top Header */}
         <header
           className="sticky top-0 z-40 flex h-16 items-center justify-between px-8"
@@ -152,7 +165,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-8">{children}</main>
 
         {/* Footer */}
         <footer

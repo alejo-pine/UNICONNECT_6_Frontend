@@ -21,6 +21,8 @@ import {
   DrawerContentScrollView,
   DrawerItem,
 } from "@react-navigation/drawer";
+import { GlobalSocketNotifications } from "@/src/components/GlobalSocketNotifications";
+import { NotificationBell } from "@/src/components/NotificationBell";
 
 const PLATFORM_PRIMARY_BLUE = "#00284D";
 
@@ -262,6 +264,24 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
             )}
             inactiveTintColor="#FFFFFF"
           />
+
+          <DrawerItem
+            label="Foros"
+            onPress={() => {
+              props.navigation.closeDrawer();
+              router.navigate("/forum");
+            }}
+            labelStyle={styles.drawerItemLabel}
+            style={styles.drawerItem}
+            icon={({ size, color }) => (
+              <Ionicons
+                name="chatbox-ellipses-outline"
+                size={size}
+                color={color}
+              />
+            )}
+            inactiveTintColor="#FFFFFF"
+          />
         </View>
       </DrawerContentScrollView>
 
@@ -288,7 +308,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 export default function TabLayout() {
   const { token } = useAuthStore();
   const router = useRouter();
-
   // 🛑 EL GUARDIÁN INTELIGENTE
   // Solo se ejecuta si esta pantalla está ACTIVA y VISIBLE
   useFocusEffect(
@@ -303,7 +322,9 @@ export default function TabLayout() {
   );
 
   return (
-    <Drawer
+    <>
+      <GlobalSocketNotifications />
+      <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: true,
@@ -315,6 +336,7 @@ export default function TabLayout() {
           fontWeight: "600",
           fontSize: 17,
         },
+        headerRight: () => <NotificationBell />,
         overlayColor: "rgba(0,0,0,0.6)",
         drawerStyle: styles.drawerStyle,
         drawerType: "front",
@@ -349,6 +371,7 @@ export default function TabLayout() {
         }}
       />
     </Drawer>
+    </>
   );
 }
 

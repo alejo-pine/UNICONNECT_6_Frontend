@@ -71,3 +71,66 @@ export interface TransferAdminResponse {
   success: boolean;
   message?: string;
 }
+
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly';
+
+export interface StudySession {
+  id: string;
+  groupId: string;
+  creatorId: string;
+  name: string;
+  description: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  seriesId: string | null;
+  recurrenceType: RecurrenceType;
+  createdAt: string;
+}
+
+export interface CreateStudySessionPayload {
+  name: string;
+  description: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  recurrenceType: RecurrenceType;
+  recurrenceEndDate?: string;
+}
+
+export interface UpdateStudySessionPayload {
+  name?: string;
+  description?: string;
+  location?: string;
+  updateMode: 'this' | 'future';
+  fromDate?: string;
+}
+
+export interface OpenGraphData {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  url: string;
+}
+
+export interface GroupResource {
+  id: string;
+  group_id: string;
+  uploaded_by: string;
+  url: string;
+  title: string;
+  description: string;
+  image_url: string;
+  role_required: 'member' | 'admin';
+  metadata?: any;
+  created_at: string;
+}
+
+export interface CreateResourcePayload {
+  url: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  roleRequired?: 'member' | 'admin';
+  metadata?: any;
+}

@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import React from 'react';
 import { Pressable } from 'react-native';
+import { NotificationBell } from '@/src/components/NotificationBell';
 
 export default function StudyGroupsLayout() {
   return (
@@ -16,6 +17,7 @@ export default function StudyGroupsLayout() {
         headerTintColor: '#FFFFFF',
         headerTitleStyle: { fontWeight: '600', fontSize: 17 },
         contentStyle: { backgroundColor: '#F8F9FA' },
+        headerRight: () => <NotificationBell />,
       }}
     >
       <Stack.Screen
@@ -34,7 +36,7 @@ export default function StudyGroupsLayout() {
       />
       <Stack.Screen name="create" options={{ title: 'Nuevo Grupo de Estudio' }} />
       <Stack.Screen name="[id]" options={{ title: 'Detalles del Grupo' }} />
-      <Stack.Screen name="wall" options={{ title: 'Muro del Grupo' }} />
+      <Stack.Screen name="transfer-admin" options={{ title: 'Transferir Administración' }} />
     </Stack>
   );
 }

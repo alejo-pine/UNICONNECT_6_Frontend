@@ -551,4 +551,142 @@ export const groupsHttpService = {
       return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
     }
   },
+
+  async createSession(groupId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/${groupId}/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  },
+
+  async updateSession(sessionId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión.' };
+    }
+  },
+
+  async getOpenGraphPreview(url: string, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/open-graph?url=${encodeURIComponent(url)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      const payload = json as Record<string, any>;
+      return { success: true, data: payload.data || payload };
+    } catch {
+      return { success: false, error: 'Error de conexión obteniendo preview.' };
+    }
+  },
+
+  async createResource(groupId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/${groupId}/resources`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión creando recurso.' };
+    }
+  },
+
+  async getGroupResources(groupId: string, token?: string | null): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/${groupId}/resources`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      const payload = json as Record<string, any>;
+      return { success: true, data: payload.data || [] };
+    } catch {
+      return { success: false, error: 'Error de conexión listando recursos.' };
+    }
+  },
+
+  async editGroupResource(groupId: string, resourceId: string, payload: any, token?: string | null): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${GROUPS_ENDPOINT}/${groupId}/resources/${resourceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await readJson(response);
+
+      if (!response.ok) {
+        return { success: false, error: getErrorMessage(json, response.status) };
+      }
+
+      return { success: true, data: json };
+    } catch {
+      return { success: false, error: 'Error de conexión editando recurso.' };
+    }
+  }
 };

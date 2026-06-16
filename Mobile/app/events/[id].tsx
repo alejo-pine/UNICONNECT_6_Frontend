@@ -11,6 +11,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -81,7 +82,25 @@ export default function EventDetailRoute() {
   const router = useRouter();
 
   const eventId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
-  const { event, isLoading, error, retry } = useEventDetail(eventId);
+  const { event, isLoading, isActionLoading, error, retry, registerToEvent, cancelRegistration } = useEventDetail(eventId);
+
+  const handleRegister = async () => {
+    const result = await registerToEvent();
+    if (result.success) {
+      Alert.alert('Éxito', 'Te has registrado exitosamente al evento.');
+    } else {
+      Alert.alert('Error', result.error ?? 'No se pudo registrar al evento.');
+    }
+  };
+
+  const handleCancel = async () => {
+    const result = await cancelRegistration();
+    if (result.success) {
+      Alert.alert('Cancelado', 'Tu registro ha sido cancelado exitosamente.');
+    } else {
+      Alert.alert('Error', result.error ?? 'No se pudo cancelar el registro.');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -138,11 +157,44 @@ export default function EventDetailRoute() {
           <InfoRow icon="location-outline" label="Ubicación" value={event.location} />
           <InfoRow icon="calendar-outline" label="Fecha" value={formatDate(event.event_date)} />
           <InfoRow icon="time-outline" label="Hora" value={formatTime(event.event_time)} />
+          <InfoRow icon="people-outline" label="Cupos Disponibles" value={`${event.available_spots} / ${event.capacity}`} />
         </View>
 
         <View style={styles.descriptionSection}>
           <Text style={styles.descriptionTitle}>Descripción</Text>
           <Text style={styles.descriptionText}>{event.description || 'Sin descripción disponible.'}</Text>
+        </View>
+
+        <View style={styles.actionContainer}>
+          {event.isRegistered ? (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.cancelButton, isActionLoading && styles.buttonDisabled]} 
+              onPress={handleCancel}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.actionButtonText}>Cancelar Registro</Text>
+              )}
+            </TouchableOpacity>
+          ) : event.available_spots <= 0 ? (
+            <View style={[styles.actionButton, styles.disabledButton]}>
+              <Text style={styles.actionButtonText}>Cupos Agotados</Text>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.registerButton, isActionLoading && styles.buttonDisabled]} 
+              onPress={handleRegister}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.actionButtonText}>Registrarme al Evento</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -281,5 +333,34 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  actionContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 32,
+    paddingBottom: 20,
+  },
+  actionButton: {
+    height: 50,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  registerButton: {
+    backgroundColor: colors.primary,
+  },
+  cancelButton: {
+    backgroundColor: '#EF4444', // Red-500
+  },
+  disabledButton: {
+    backgroundColor: '#94A3B8', // Slate-400
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

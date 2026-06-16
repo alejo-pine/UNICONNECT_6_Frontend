@@ -7,6 +7,7 @@ import { API_BASE_URL } from '@/src/config/api';
 import type {
     ApiResponse,
     CreateGroupResponse,
+  GroupUser,
     StudyGroup,
     StudyGroupCreatePayload,
 } from '../types/groups';
@@ -122,8 +123,84 @@ const resolveSubject = (rawGroup: Record<string, unknown>) => {
   return undefined;
 };
 
+const normalizeGroupUser = (raw: unknown): GroupUser | null => {
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const id = toStringSafe(raw);
+    return id ? { id } : null;
+  }
+
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const user = raw as Record<string, unknown>;
+  const id =
+    toStringSafe(user.id) ||
+    toStringSafe(user.user_id) ||
+    toStringSafe(user.userId) ||
+    toStringSafe(user.member_id) ||
+    toStringSafe(user.memberId);
+
+  if (!id) {
+    return null;
+  }
+
+  const name =
+    toStringSafe(user.name) ||
+    toStringSafe(user.full_name) ||
+    toStringSafe(user.fullName) ||
+    toStringSafe(user.displayName);
+
+  const email = toStringSafe(user.email);
+  const avatarUrl =
+    toStringSafe(user.avatar_url) || toStringSafe(user.avatarUrl) || toStringSafe(user.photoUrl);
+
+  return {
+    id,
+    name: name || undefined,
+    email: email || undefined,
+    avatarUrl: avatarUrl || undefined,
+  };
+};
+
+const normalizeGroupUsers = (rawUsers: unknown): GroupUser[] => {
+  if (!Array.isArray(rawUsers)) {
+    return [];
+  }
+
+  return rawUsers
+    .map(normalizeGroupUser)
+    .filter((user): user is GroupUser => Boolean(user));
+};
+
+const pickFirstUserList = (rawGroup: Record<string, unknown>, keys: string[]): GroupUser[] => {
+  for (const key of keys) {
+    const users = normalizeGroupUsers(rawGroup[key]);
+    if (users.length > 0) {
+      return users;
+    }
+  }
+
+  return [];
+};
+
 const normalizeGroup = (raw: unknown): StudyGroup => {
   const rawGroup = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  const creatorId =
+    toStringSafe(rawGroup.creator_id) ||
+    toStringSafe(rawGroup.creatorId) ||
+    toStringSafe(rawGroup.created_by) ||
+    toStringSafe(rawGroup.createdBy);
+
+  const members = pickFirstUserList(rawGroup, ['members', 'members_list', 'membersList']);
+
+  const pendingRequests = pickFirstUserList(rawGroup, [
+    'pendingRequests',
+    'pending_requests',
+    'join_requests',
+    'joinRequests',
+  ]);
 
   return {
     id: toStringSafe(rawGroup.id),
@@ -132,11 +209,8 @@ const normalizeGroup = (raw: unknown): StudyGroup => {
     subject_id: toStringSafe(rawGroup.subject_id) || toStringSafe(rawGroup.subjectId),
     subject: resolveSubject(rawGroup),
     category: rawGroup.category as StudyGroup['category'],
-    creator_id:
-      toStringSafe(rawGroup.creator_id) ||
-      toStringSafe(rawGroup.creatorId) ||
-      toStringSafe(rawGroup.created_by) ||
-      toStringSafe(rawGroup.createdBy),
+    creator_id: creatorId,
+    createdBy: creatorId,
     created_at: toStringSafe(rawGroup.created_at) || toStringSafe(rawGroup.createdAt),
     updated_at: toStringSafe(rawGroup.updated_at) || toStringSafe(rawGroup.updatedAt) || undefined,
     member_count:
@@ -145,6 +219,9 @@ const normalizeGroup = (raw: unknown): StudyGroup => {
       toNumberSafe(rawGroup.members_count),
     is_member: toBooleanSafe(rawGroup.is_member ?? rawGroup.isMember),
     is_admin: toBooleanSafe(rawGroup.is_admin ?? rawGroup.isAdmin),
+    members,
+    pendingRequests,
+    pendingAdminTransfer: rawGroup.pendingAdminTransfer as StudyGroup['pendingAdminTransfer'],
   };
 };
 
@@ -453,4 +530,305 @@ export const groupsHttpService = {
       data: normalizedGroup,
     };
   },
+
+  /**
+   * Aceptar solicitud de ingreso al grupo
+   * POST /api/study-groups/:groupId/requests/:userId/accept
+   */
+  async acceptRequest(groupId: string, userId: string, token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/requests/${userId}/accept`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
+  },
+
+  /**
+   * Rechazar solicitud de ingreso al grupo
+   * POST /api/study-groups/:groupId/requests/:userId/reject
+   */
+  async rejectRequest(groupId: string, userId: string, token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/requests/${userId}/reject`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
+  },
+
+  /**
+   * Transferir administración y abandonar grupo
+   * POST /api/study-groups/:groupId/transfer-admin
+   */
+  async transferAdminAndLeave(groupId: string, newAdminUserId: string, token: string): Promise<ApiResponse<{ success: boolean }>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/transfer-admin`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newAdminUserId }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: { success: true } };
+  },
+
+  /**
+   * Responder a transferencia de administración
+   * POST /api/study-groups/:groupId/transfer-admin/respond
+   */
+  async respondTransferAdmin(groupId: string, action: 'accept' | 'reject', token: string): Promise<ApiResponse<StudyGroup>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/transfer-admin/respond`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    let groupPayload: unknown = result.json;
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (payload.data && typeof payload.data === 'object') groupPayload = payload.data;
+    }
+    return { success: true, data: normalizeGroup(groupPayload) };
+  },
+
+  /**
+   * Obtener sesiones de estudio de un grupo
+   * GET /api/study-groups/:groupId/sessions
+   */
+  async getStudySessions(groupId: string, token: string): Promise<ApiResponse<any[]>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    
+    let sessionsPayload: any[] = [];
+    if (result.json && typeof result.json === 'object') {
+      const payload = result.json as Record<string, unknown>;
+      if (Array.isArray(payload.data)) {
+        sessionsPayload = payload.data;
+      } else if (Array.isArray(result.json)) {
+        sessionsPayload = result.json;
+      }
+    }
+    
+    return { success: true, data: sessionsPayload };
+  },
+
+  /**
+   * Crear sesión(es) de estudio
+   * POST /api/study-groups/:groupId/sessions
+   */
+  async createSession(
+    groupId: string,
+    payload: {
+      name: string;
+      description?: string;
+      location?: string;
+      startTime: string;
+      endTime: string;
+      recurrenceType: string;
+      recurrenceEndDate?: string;
+    },
+    token: string
+  ): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  /**
+   * Actualizar una sesión de estudio
+   * PUT /api/study-groups/sessions/:sessionId
+   */
+  async updateSession(
+    sessionId: string,
+    payload: { name?: string; description?: string; location?: string; updateMode: 'this' | 'future'; fromDate?: string },
+    token: string
+  ): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/sessions/${sessionId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async getOpenGraphPreview(url: string, token: string): Promise<ApiResponse<any>> {
+    const fetchUrl = `${GROUPS_ENDPOINT}/open-graph?url=${encodeURIComponent(url)}`;
+    const result = await executeFetch(() =>
+      fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    const payload = result.json as Record<string, any>;
+    return { success: true, data: payload.data || payload };
+  },
+
+  async createResource(groupId: string, payload: any, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async getGroupResources(groupId: string, token: string): Promise<ApiResponse<any[]>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    const payload = result.json as Record<string, any>;
+    return { success: true, data: payload.data || [] };
+  },
+
+  async editGroupResource(groupId: string, resourceId: string, payload: any, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/resources/${resourceId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async deleteSession(groupId: string, sessionId: string, token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions/${sessionId}`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
+
+  async updateSessionAttendance(groupId: string, sessionId: string, status: 'attending' | 'declined' | 'pending', token: string): Promise<ApiResponse<any>> {
+    const url = `${GROUPS_ENDPOINT}/${groupId}/sessions/${sessionId}/attendance`;
+    const result = await executeFetch(() =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      })
+    );
+    if (!result.ok) {
+      return { success: false, error: getErrorMessage(result.json, result.status) };
+    }
+    return { success: true, data: result.json };
+  },
 };
+

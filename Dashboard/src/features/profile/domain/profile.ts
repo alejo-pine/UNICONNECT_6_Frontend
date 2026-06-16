@@ -6,6 +6,20 @@ export interface ProfileSubject {
   program?: string;
 }
 
+export interface ProfileStatistics {
+  createdGroupsCount: number;
+  joinedGroupsCount: number;
+  messagesSentCount: number;
+}
+
+export interface ProfileBadge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlockedAt: string;
+}
+
 export interface ProfileData {
   id: string;
   name?: string;
@@ -16,6 +30,9 @@ export interface ProfileData {
   phone_number?: string | null;
   created_at?: string;
   materias?: ProfileSubject[];
+  subjects?: string[];
+  statistics?: ProfileStatistics;
+  badges?: ProfileBadge[];
 }
 
 export interface Career {

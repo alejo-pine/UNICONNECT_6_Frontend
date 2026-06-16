@@ -48,6 +48,9 @@ const normalizeProfile = (raw: unknown): ProfileData | null => {
     semester: typeof inner.semester === 'number' ? inner.semester : (inner.semester ? Number(inner.semester) : null),
     phone_number: (inner.phone_number ?? inner.phoneNumber ?? null) as string | null,
     created_at: (inner.created_at ?? inner.createdAt ?? '') as string || undefined,
+    subjects: Array.isArray(inner.subjects) ? inner.subjects : [],
+    statistics: inner.statistics as any,
+    badges: inner.badges as any,
   };
 };
 
@@ -64,7 +67,7 @@ const extractSubjects = (payload: unknown): ProfileSubject[] => {
 export const profileHttpService = {
   async getProfile(userId: string, token: string): Promise<ApiResponse<ProfileData>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/profiles/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/profiles/${userId}?vista=completa`, {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
       const json = await readJson(response);

@@ -75,3 +75,53 @@ export function getChatServiceUrl(): string {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+
+/**
+ * Returns the base URL for Socket.IO connections (no /api path).
+ * Uses the same host detection as getApiBaseUrl() so it works on
+ * physical devices, emulators, and ngrok tunnels alike.
+ */
+export function getSocketBaseUrl(): string {
+  // Explicit socket URL override
+  const explicit = process.env.EXPO_PUBLIC_SOCKET_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.trim().replace(/\/+$/, '');
+
+  // Explicit backend URL without /api suffix
+  const backendPublicUrl = process.env.BACKEND_PUBLIC_URL;
+  if (backendPublicUrl && backendPublicUrl.trim().length > 0) {
+    // Strip any trailing /api to get the socket root
+    return backendPublicUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
+  }
+
+  // EXPO_PUBLIC_API_BASE_URL - strip /api suffix
+  const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envBaseUrl && envBaseUrl.trim().length > 0) {
+    return envBaseUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
+  }
+
+  // Auto-detect LAN IP from Expo (works on physical devices connected to same network)
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    return `http://${host}:${DEFAULT_API_PORT}`;
+  }
+
+  return `http://10.0.2.2:${DEFAULT_API_PORT}`;
+}
+
+export const SOCKET_BASE_URL = getSocketBaseUrl();
+
+/**
+ * Returns the URL for Auth0 to backend synchronization.
+ * It removes '/api' from the base URL and appends '/auth/sync'.
+ */
+export function getAuthSyncUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_AUTH_SYNC_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.trim();
+
+  // Fallback to auto-detected API URL
+  const baseUrl = getApiBaseUrl();
+  return baseUrl.replace(/\/api\/?$/, '') + '/auth/sync';
+}
+
+export const AUTH_SYNC_URL = getAuthSyncUrl();

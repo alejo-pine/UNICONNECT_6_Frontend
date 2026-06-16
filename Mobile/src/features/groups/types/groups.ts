@@ -7,6 +7,13 @@ export interface StudyGroupSubject {
   name: string;
 }
 
+export interface GroupUser {
+  id: string;
+  name?: string;
+  email?: string;
+  avatarUrl?: string;
+}
+
 /**
  * Respuesta genérica de la API
  */
@@ -41,11 +48,19 @@ export interface StudyGroup {
   subject?: StudyGroupSubject;
   category?: StudyGroupCategory;
   creator_id: string;
+  createdBy?: string;
   created_at: string;
   updated_at?: string;
   member_count?: number;
   is_member?: boolean;
   is_admin: boolean;
+  members?: GroupUser[];
+  pendingRequests?: GroupUser[];
+  pendingAdminTransfer?: {
+    fromUserId: string;
+    toUserId: string;
+    status: 'pending' | 'accepted' | 'rejected';
+  };
 }
 
 /**
@@ -61,3 +76,32 @@ export interface CreateGroupResponse {
 }
 
 export type GroupSearchStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
+
+export interface OpenGraphData {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  url: string;
+}
+
+export interface GroupResource {
+  id: string;
+  group_id: string;
+  uploaded_by: string;
+  url: string;
+  title: string;
+  description: string;
+  image_url: string;
+  role_required: 'member' | 'admin';
+  metadata?: any;
+  created_at: string;
+}
+
+export interface CreateResourcePayload {
+  url: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  roleRequired?: 'member' | 'admin';
+  metadata?: any;
+}

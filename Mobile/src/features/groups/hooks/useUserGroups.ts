@@ -1,13 +1,52 @@
 /**
- * Hook para obtener la lista de grupos del usuario
+ * Hook para obtener la lista de grupos del usuario con actualizaciones en tiempo real (Socket.IO)
  */
 
 import { useAuthStore } from '@/src/store/authStore';
+import { SOCKET_BASE_URL } from '@/src/config/api';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { io } from 'socket.io-client';
 import { groupsHttpService } from '../services/groupsHttpService';
 import { subjectsHttpService } from '../services/subjectsHttpService';
 import type { StudyGroup } from '../types/groups';
+
+interface StudyGroupRealtimePayload {
+  groupId: string;
+  members?: unknown[];
+  pendingRequests?: unknown[];
+}
+
+interface AdminTransferRequestedPayload {
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+}
+
+const realtimeSocketUrl = SOCKET_BASE_URL;
+
+const toUserIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (typeof item === 'number') return String(item);
+      if (item && typeof item === 'object') {
+        const maybeUser = item as Record<string, unknown>;
+        if (typeof maybeUser.id === 'string') return maybeUser.id;
+        if (typeof maybeUser.userId === 'string') return maybeUser.userId;
+        if (typeof maybeUser.user_id === 'string') return maybeUser.user_id;
+        if (typeof maybeUser.profile_id === 'string') return maybeUser.profile_id;
+      }
+      return '';
+    })
+    .filter((id) => id.length > 0);
+};
+
+interface UseUserGroupsOptions {
+  onAdminTransferRequested?: (payload: AdminTransferRequestedPayload) => void;
+}
 
 interface UseUserGroupsReturn {
   adminGroups: StudyGroup[];
@@ -19,27 +58,38 @@ interface UseUserGroupsReturn {
 
 const SUBJECT_NAME_CACHE_KEY = 'subject_name_cache';
 
-export const useUserGroups = (): UseUserGroupsReturn => {
+export const useUserGroups = (options: UseUserGroupsOptions = {}): UseUserGroupsReturn => {
+  const { onAdminTransferRequested } = options;
   const { token, userId } = useAuthStore();
   const [allGroups, setAllGroups] = useState<StudyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const isMountedRef = useRef(true);
+  const groupsRef = useRef<StudyGroup[]>([]);
+  const socketRef = useRef<any>(null);
+  const onAdminTransferRequestedRef = useRef(onAdminTransferRequested);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  // Cache de nombres de materias usados en grupos para mantenerlos incluso si el
-  // usuario elimina la materia de su perfil.
+  useEffect(() => {
+    onAdminTransferRequestedRef.current = onAdminTransferRequested;
+  }, [onAdminTransferRequested]);
+
+  useEffect(() => {
+    groupsRef.current = allGroups;
+  }, [allGroups]);
+
   const subjectNameCacheRef = useRef<Map<string, string>>(new Map());
   const cacheLoadedRef = useRef(false);
 
   const loadSubjectNameCache = useCallback(async () => {
     if (cacheLoadedRef.current) return;
-
     try {
       const cached = await SecureStore.getItemAsync(SUBJECT_NAME_CACHE_KEY);
       if (!cached) {
@@ -66,6 +116,12 @@ export const useUserGroups = (): UseUserGroupsReturn => {
     }
   }, []);
 
+  const preserveSubject = useCallback((incoming: StudyGroup, existing: StudyGroup): StudyGroup => {
+    if (incoming.subject?.name) return incoming;
+    if (existing.subject?.name) return { ...incoming, subject: existing.subject };
+    return incoming;
+  }, []);
+
   const reload = useCallback(async () => {
     if (!token) {
       if (isMountedRef.current) {
@@ -81,7 +137,6 @@ export const useUserGroups = (): UseUserGroupsReturn => {
     }
 
     try {
-      // Cargar cache local de nombres de materias (para mantenerlas aunque se eliminen del perfil)
       await loadSubjectNameCache();
 
       const [groupsResponse, subjectsResponse] = await Promise.all([
@@ -92,15 +147,11 @@ export const useUserGroups = (): UseUserGroupsReturn => {
       ]);
 
       const profileSubjects = subjectsResponse.success && subjectsResponse.data ? subjectsResponse.data : [];
-
-      // Merge cached subject names (from previously loaded groups) + current profile subjects.
-      // Profile subjects take precedence since pueden haber sido renombradas.
       const subjectNameMap = new Map(subjectNameCacheRef.current);
       profileSubjects.forEach((subject) => {
         subjectNameMap.set(String(subject.id), subject.name);
       });
 
-      // Si aún faltan nombres de materias, intentar obtenerlos por ID desde el backend.
       const missingSubjectIds = new Set<string>();
       if (groupsResponse.success && groupsResponse.data) {
         groupsResponse.data.forEach((group) => {
@@ -122,19 +173,14 @@ export const useUserGroups = (): UseUserGroupsReturn => {
                 subjectNameMap.set(subjectId, subjectResponse.data.name);
               }
             } catch {
-              // ignore errors; no será crítico si no logramos resolver el nombre
+              // ignore
             }
           })
         );
       }
 
-      if (__DEV__) {
-        console.log('[useUserGroups] subjectNameMap:', Object.fromEntries(subjectNameMap));
-      }
-
       if (groupsResponse.success && groupsResponse.data) {
         const enrichedGroups = groupsResponse.data.map((group) => {
-          // Si el grupo ya incluye el nombre de la materia, lo preservamos y lo cacheamos.
           if (group.subject?.name) {
             if (group.subject.id) {
               subjectNameCacheRef.current.set(String(group.subject.id), group.subject.name);
@@ -143,11 +189,8 @@ export const useUserGroups = (): UseUserGroupsReturn => {
           }
 
           const resolvedName = subjectNameMap.get(String(group.subject_id));
-          if (!resolvedName) {
-            return group;
-          }
+          if (!resolvedName) return group;
 
-          // Cacheamos el nombre para mantenerlo cuando el usuario elimine la materia de su perfil.
           subjectNameCacheRef.current.set(String(group.subject_id), resolvedName);
 
           return {
@@ -158,17 +201,6 @@ export const useUserGroups = (): UseUserGroupsReturn => {
             },
           };
         });
-
-        if (__DEV__) {
-          console.log(
-            '[useUserGroups] Enriched groups subjects:',
-            enrichedGroups.map((group) => ({
-              groupId: group.id,
-              subject_id: group.subject_id,
-              subject: group.subject,
-            }))
-          );
-        }
 
         if (isMountedRef.current) {
           setAllGroups(enrichedGroups);
@@ -193,14 +225,107 @@ export const useUserGroups = (): UseUserGroupsReturn => {
     }
   }, [token, userId, loadSubjectNameCache, persistSubjectNameCache]);
 
-  // Ejecuta carga inicial y cada vez que cambian credenciales (vía reload memoizado)
   useEffect(() => {
     reload();
   }, [reload]);
 
-  // Separar grupos: administrados vs participante
-  const adminGroups = allGroups.filter((g) => g.is_admin);
-  const participantGroups = allGroups.filter((g) => !g.is_admin);
+  // SOCKET.IO REALTIME LOGIC (Ported from Dashboard Web)
+  useEffect(() => {
+    if (!token || !userId) return;
+
+    const socket = io(realtimeSocketUrl, {
+      auth: {
+        'x-user-id': userId,
+        Authorization: `Bearer ${token}`,
+      },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+    });
+
+    socketRef.current = socket;
+
+    const joinKnownGroups = () => {
+      for (const group of groupsRef.current) {
+        socket.emit('study-group:join', { groupId: group.id });
+      }
+    };
+
+    const handleStudyGroupUpdated = (payload: StudyGroupRealtimePayload) => {
+      const hasMembers = Array.isArray(payload.members);
+      const hasPending = Array.isArray(payload.pendingRequests);
+      const nextMemberIds = hasMembers ? toUserIds(payload.members) : [];
+      const nextPendingIds = hasPending ? toUserIds(payload.pendingRequests) : [];
+      // Map to GroupUser shape so the type matches StudyGroup.members/pendingRequests
+      const nextMembers = nextMemberIds.map((id) => ({ id }));
+      const nextPendingRequests = nextPendingIds.map((id) => ({ id }));
+
+      setAllGroups((currentGroups) =>
+        currentGroups.map((group): StudyGroup => {
+          if (group.id !== payload.groupId) return group;
+          return {
+            ...group,
+            members: hasMembers ? nextMembers : group.members,
+            member_count: hasMembers ? nextMembers.length : group.member_count,
+            pendingRequests: hasPending ? nextPendingRequests : group.pendingRequests,
+          };
+        })
+      );
+
+      // Re-sync with backend detail so local storage gets latest deep data
+      void (async () => {
+        const detailResponse = await groupsHttpService.getGroup(payload.groupId, token);
+        if (!detailResponse.success || !detailResponse.data) return;
+        const detailGroup = detailResponse.data;
+
+        setAllGroups((currentGroups) =>
+          currentGroups.map((group) => {
+            if (group.id !== payload.groupId) return group;
+            return preserveSubject(
+              { ...group, ...detailGroup, is_admin: group.is_admin, is_member: group.is_member },
+              group
+            );
+          })
+        );
+      })();
+    };
+
+    const handleAdminTransferRequested = (payload: AdminTransferRequestedPayload) => {
+      if (payload.toUserId !== userId) return;
+      onAdminTransferRequestedRef.current?.(payload);
+    };
+
+    socket.on('connect', joinKnownGroups);
+    socket.on('study-group:updated', handleStudyGroupUpdated);
+    socket.on('admin_transfer_requested', handleAdminTransferRequested);
+
+    if (socket.connected) {
+      joinKnownGroups();
+    }
+
+    return () => {
+      for (const group of groupsRef.current) {
+        socket.emit('study-group:leave', { groupId: group.id });
+      }
+      socket.off('connect', joinKnownGroups);
+      socket.off('study-group:updated', handleStudyGroupUpdated);
+      socket.off('admin_transfer_requested', handleAdminTransferRequested);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [userId, token, preserveSubject]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    for (const group of allGroups) {
+      socket.emit('study-group:join', { groupId: group.id });
+    }
+  }, [allGroups]);
+
+  const adminGroups = useMemo(() => allGroups.filter((g) => g.is_admin), [allGroups]);
+  const participantGroups = useMemo(() => allGroups.filter((g) => !g.is_admin), [allGroups]);
 
   return { adminGroups, participantGroups, loading, error, reload };
 };

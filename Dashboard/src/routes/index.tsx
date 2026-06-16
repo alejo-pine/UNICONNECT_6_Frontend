@@ -8,8 +8,14 @@ import { AuthCallbackPage } from '@features/auth/presentation/pages/AuthCallback
 import { GroupsListPage } from '@features/groups/presentation/pages/GroupsListPage';
 import { GroupDetailPage } from '@features/groups/presentation/pages/GroupDetailPage';
 import { CreateGroupPage } from '@features/groups/presentation/pages/CreateGroupPage';
-import { WallInboxPage, WallHistoryPage } from '@features/chat';
+import { ChatInboxPage, WallHistoryPage, DmHistoryPage } from '@features/chat';
+import { EventsListPage, EventDetailPage } from '@features/events';
+import { SearchPage, PublicProfilePage } from '@features/search';
 import { ProfilePage } from '@features/profile/presentation/pages/ProfilePage';
+import { ForumSubjectsPage, ForumQuestionsPage, ForumQuestionDetailPage } from '@features/forum';
+import { ModerationHistoryPage } from '@features/admin/presentation/pages/ModerationHistoryPage';
+import { AdminCategoriesPage } from '@features/admin/presentation/pages/AdminCategoriesPage';
+import { AdminChatbotFeedbackPage } from '@features/admin/presentation/pages/AdminChatbotFeedbackPage';
 import { OnboardingWelcomePage } from '@features/onboarding/presentation/pages/OnboardingWelcomePage';
 import { OnboardingStepOnePage } from '@features/onboarding/presentation/pages/OnboardingStepOnePage';
 import { OnboardingSubjectsPage } from '@features/onboarding/presentation/pages/OnboardingSubjectsPage';
@@ -105,9 +111,20 @@ export function AppRouter() {
         <Route path="/groups" element={<GroupsListPage />} />
         <Route path="/groups/create" element={<CreateGroupPage />} />
         <Route path="/groups/:groupId" element={<GroupDetailPage />} />
-        <Route path="/chat" element={<WallInboxPage />} />
+        <Route path="/chat" element={<ChatInboxPage />} />
         <Route path="/chat/groups/:groupId/wall" element={<WallHistoryPage />} />
+        <Route path="/chat/dm/:conversationId" element={<DmHistoryPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/events" element={<EventsListPage />} />
+        <Route path="/events/:eventId" element={<EventDetailPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/search/profile/:profileId" element={<PublicProfilePage />} />
+        <Route path="/forum" element={<ForumSubjectsPage />} />
+        <Route path="/forum/:subjectId" element={<ForumQuestionsPage />} />
+        <Route path="/forum/:subjectId/question/:questionId" element={<ForumQuestionDetailPage />} />
+        <Route path="/admin/moderation" element={<ModerationHistoryPage />} />
+        <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+        <Route path="/admin/chatbot-feedback" element={<AdminChatbotFeedbackPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/groups" replace />} />

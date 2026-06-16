@@ -2,7 +2,7 @@ import { colors } from "@/src/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -11,9 +11,30 @@ import {
     Text,
     TouchableOpacity,
     View,
+    ScrollView,
+    Alert,
+    TextInput
 } from "react-native";
+
+function HighlightText({ text, search, style, numberOfLines }: { text: string; search: string; style?: any; numberOfLines?: number }) {
+  if (!search || search.length < 3) return <Text style={style} numberOfLines={numberOfLines}>{text}</Text>;
+  const parts = text.split(new RegExp(`(${search})`, 'gi'));
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, i) =>
+        part.toLowerCase() === search.toLowerCase() ? (
+          <Text key={i} style={{ backgroundColor: '#fef08a', color: '#0f172a' }}>{part}</Text>
+        ) : (
+          <Text key={i}>{part}</Text>
+        )
+      )}
+    </Text>
+  );
+}
 import { useEventsFeed } from "../hooks/useEventsFeed";
+import { useEventSubscription } from "../hooks/useEventSubscription";
 import type { EventCardSummary } from "../types/events";
+import { CreateEventModal } from "../components/CreateEventModal";
 
 const formatDate = (dateValue: string): string => {
   const date = new Date(`${dateValue}T00:00:00`);
@@ -57,29 +78,43 @@ const getEventImageSource = (imageUrl: string | null | undefined) => {
 
 function EventCard({
   event,
+  search,
   onPress,
 }: {
   event: EventCardSummary;
+  search: string;
   onPress: (eventId: string) => void;
 }) {
+  const isSoldOut = event.available_spots <= 0;
+
   return (
     <View style={styles.card}>
-      <Image
-        source={getEventImageSource(event.image_url)}
-        style={styles.cardImage}
-        contentFit="cover"
-        transition={120}
-      />
+      <View style={{ position: 'relative' }}>
+        <Image
+          source={getEventImageSource(event.image_url)}
+          style={[styles.cardImage, isSoldOut && { opacity: 0.6 }]}
+          contentFit="cover"
+          transition={120}
+        />
+        {isSoldOut && (
+          <View style={styles.soldOutBadge}>
+            <Text style={styles.soldOutText}>CUPO AGOTADO</Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{event.title}</Text>
+        <HighlightText text={event.title} search={search} style={styles.cardTitle} />
         <Text style={styles.cardFaculty}>
           {event.faculty || "Facultad no disponible"}
         </Text>
 
-        <Text style={styles.cardDescription} numberOfLines={3}>
-          {event.description || "Sin descripción disponible."}
-        </Text>
+        <HighlightText 
+          text={event.description || "Sin descripción disponible."} 
+          search={search} 
+          style={styles.cardDescription} 
+          numberOfLines={3} 
+        />
 
         <View style={styles.metaRow}>
           <Ionicons name="calendar-outline" size={14} color={colors.gold} />
@@ -105,10 +140,17 @@ function EventCard({
   );
 }
 
+const CATEGORIES = ["Académico", "Deportivo", "Cultural", "Social"];
+
 export const EventsScreen: React.FC = () => {
   const router = useRouter();
-  const { events, isLoading, isRefreshing, error, hasEvents, refreshEvents } =
-    useEventsFeed(20);
+  const limit = 10;
+  const { 
+    events, total, isLoading, isRefreshing, error, hasEvents, refreshEvents,
+    page, setPage, search, setSearch, categories, handleCategoryToggle
+  } = useEventsFeed(limit);
+  const { subscribedCategories, loadingInit, isSubscribed, subscribe, unsubscribe, isSubmitting } = useEventSubscription();
+  const [isCreateModalVisible, setCreateModalVisible] = useState(false);
 
   const handleOpenEvent = useCallback(
     (eventId: string) => {
@@ -117,7 +159,23 @@ export const EventsScreen: React.FC = () => {
     [router],
   );
 
-  if (isLoading) {
+  const toggleSubscription = async (category: string) => {
+    if (isSubscribed(category)) {
+      const success = await unsubscribe(category);
+      if (!success) {
+        Alert.alert("Error", "No se pudo cancelar la suscripción");
+      }
+    } else {
+      const success = await subscribe(category);
+      if (success) {
+        Alert.alert("Suscrito", `Te has suscrito a eventos de categoría ${category}`);
+      } else {
+        Alert.alert("Error", "No se pudo suscribir a la categoría");
+      }
+    }
+  };
+
+  if (!events.length && isLoading && !isRefreshing) {
     return (
       <View style={styles.centerState}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -142,10 +200,122 @@ export const EventsScreen: React.FC = () => {
     );
   }
 
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerTopRow}>
+        <View>
+          <Text style={styles.headerTitle}>Eventos</Text>
+          <Text style={styles.headerSubtitle}>
+            Mantente al día con los eventos de UniConnect
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => setCreateModalVisible(true)}
+        >
+          <Ionicons name="add" size={20} color="#FFF" />
+          <Text style={styles.createButtonText}>Crear</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <Text style={styles.categoriesTitle}>Suscríbete a Categorías:</Text>
+      {loadingInit ? (
+        <View style={styles.categoriesLoaderContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.categoriesLoaderText}>Cargando categorías...</Text>
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+          {CATEGORIES.map((category) => {
+            const subscribed = isSubscribed(category);
+            return (
+              <TouchableOpacity
+                key={category}
+                style={[styles.categoryBadge, subscribed && styles.categoryBadgeSubscribed]}
+                onPress={() => toggleSubscription(category)}
+                disabled={isSubmitting}
+              >
+                <Ionicons 
+                  name={subscribed ? "notifications" : "notifications-outline"} 
+                  size={14} 
+                  color={subscribed ? "#FFF" : colors.primary} 
+                />
+                <Text style={[styles.categoryText, subscribed && styles.categoryTextSubscribed]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      <Text style={[styles.categoriesTitle, { marginTop: 16 }]}>Filtros y Búsqueda:</Text>
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color="#94A3B8" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar evento... (mín 3 car.)"
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor="#94A3B8"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+        {CATEGORIES.map((cat) => {
+          const isSelected = categories.includes(cat);
+          return (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.categoryBadge, isSelected && styles.categoryBadgeSubscribed]}
+              onPress={() => handleCategoryToggle(cat)}
+            >
+              <Text style={[styles.categoryText, isSelected && styles.categoryTextSubscribed]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const renderFooter = () => (
+    <View style={styles.paginationContainer}>
+      <TouchableOpacity
+        style={[styles.pageButton, page <= 1 && styles.pageButtonDisabled]}
+        onPress={() => setPage(page - 1)}
+        disabled={page <= 1}
+      >
+        <Ionicons name="chevron-back" size={16} color={page <= 1 ? '#94A3B8' : colors.primary} />
+        <Text style={[styles.pageButtonText, page <= 1 && styles.pageButtonTextDisabled]}>Anterior</Text>
+      </TouchableOpacity>
+      
+      <Text style={styles.pageText}>
+        Página {page} de {Math.ceil(total / limit) || 1}
+      </Text>
+
+      <TouchableOpacity
+        style={[styles.pageButton, page >= Math.ceil(total / limit) && styles.pageButtonDisabled]}
+        onPress={() => setPage(page + 1)}
+        disabled={page >= Math.ceil(total / limit)}
+      >
+        <Text style={[styles.pageButtonText, page >= Math.ceil(total / limit) && styles.pageButtonTextDisabled]}>Siguiente</Text>
+        <Ionicons name="chevron-forward" size={16} color={page >= Math.ceil(total / limit) ? '#94A3B8' : colors.primary} />
+      </TouchableOpacity>
+    </View>
+  );
+
   if (!hasEvents) {
     return (
       <View style={styles.centerState}>
-        <Ionicons name="calendar-clear-outline" size={36} color={colors.gold} />
+        {renderHeader()}
+        <Ionicons name="calendar-clear-outline" size={36} color={colors.gold} style={{ marginTop: 20 }} />
         <Text style={styles.centerStateTitle}>No hay eventos por ahora</Text>
         <Text style={styles.centerStateText}>
           Cuando se publiquen eventos aparecerán aquí.
@@ -155,26 +325,40 @@ export const EventsScreen: React.FC = () => {
   }
 
   return (
-    <FlatList
-      data={events}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={refreshEvents} />
-      }
-      ListHeaderComponent={
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Eventos</Text>
-          <Text style={styles.headerSubtitle}>
-            Mantente al día con los eventos de UniConnect
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <EventCard event={item} onPress={handleOpenEvent} />
-      )}
-    />
+    <>
+      <FlatList
+        data={events}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={refreshEvents} />
+        }
+        ListHeaderComponent={
+          <>
+            {renderHeader()}
+            {isLoading && !isRefreshing && (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ textAlign: 'center', color: '#64748B', marginTop: 8, fontSize: 13 }}>Buscando eventos...</Text>
+              </View>
+            )}
+          </>
+        }
+        renderItem={({ item }) => (
+          <EventCard event={item} search={search} onPress={handleOpenEvent} />
+        )}
+        ListFooterComponent={events.length > 0 ? renderFooter : null}
+      />
+      <CreateEventModal
+        visible={isCreateModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSuccess={() => {
+          setCreateModalVisible(false);
+          refreshEvents();
+        }}
+      />
+    </>
   );
 };
 
@@ -187,6 +371,25 @@ const styles = StyleSheet.create({
   headerContainer: {
     marginBottom: 14,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  createButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  createButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
   headerTitle: {
     color: colors.primary,
     fontSize: 24,
@@ -196,6 +399,49 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 13,
     marginTop: 2,
+    marginBottom: 12,
+  },
+  categoriesTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  categoriesScroll: {
+    gap: 8,
+    paddingBottom: 8,
+  },
+  categoriesLoaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  categoriesLoaderText: {
+    color: '#64748B',
+    fontSize: 13,
+  },
+  categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  categoryBadgeSubscribed: {
+    backgroundColor: colors.primary,
+  },
+  categoryText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  categoryTextSubscribed: {
+    color: "#FFF",
   },
   card: {
     borderRadius: 14,
@@ -286,5 +532,73 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.primary,
+  },
+  soldOutBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  soldOutText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  pageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFF',
+    gap: 4,
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#F1F5F9',
+  },
+  pageButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  pageButtonTextDisabled: {
+    color: '#94A3B8',
+  },
+  pageText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
 });

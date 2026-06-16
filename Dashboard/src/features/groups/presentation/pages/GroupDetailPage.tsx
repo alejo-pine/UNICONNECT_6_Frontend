@@ -9,6 +9,8 @@ import { useToast } from '@shared/components/ui/ToastProvider';
 import type { StudyGroup, UserProfileSummary } from '../../domain/groups';
 import { groupsHttpService } from '../../infrastructure/groupsHttpService';
 import { GroupUserRow } from '../components/GroupUserRow';
+import { StudySessionsSection } from '../components/StudySessionsSection';
+import { GroupLibrarySection } from '../components/GroupLibrarySection';
 
 interface StudyGroupRealtimePayload {
   groupId: string;
@@ -401,7 +403,6 @@ export function GroupDetailPage() {
           <p className="text-sm text-ink-500">Materia: {group.subject?.name ?? 'Sin materia'}</p>
           <p className="text-sm text-ink-500">Miembros: {membersCount}</p>
           <p className="text-sm text-ink-500">Solicitudes pendientes: {pendingRequests.length}</p>
-          <p className="text-sm text-ink-500">Administrador: {group.is_admin ? 'Si' : 'No'}</p>
 
           {isTransferPending && pendingTransferCandidate ? (
             <div className="rounded-xl p-3" style={{ background: '#d3e3ff', border: '1px solid #aac8f6' }}>
@@ -428,6 +429,10 @@ export function GroupDetailPage() {
           {leaveError ? <p className="mt-2 text-sm font-medium text-red-600">{leaveError}</p> : null}
         </div>
       </Card>
+
+      <StudySessionsSection groupId={groupId} isAdmin={isGroupAdmin} />
+
+      <GroupLibrarySection groupId={groupId} isAdmin={isGroupAdmin} />
 
       <Card className="space-y-4">
         <div>
